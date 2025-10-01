@@ -31,26 +31,48 @@ void repl(){
         
         input[strcspn(input, "\n")] = '\0'; // Remove newline character
         
-        // printf("length: %d\n", (int)strlen(input));
+        // Make a copy of input before strtok modifies it
+        char* inputCopy = strdup(input);
+        // if (inputCopy == NULL); 
+        
+        char* command = strtok(inputCopy," ");
+        if (command == NULL) continue; 
+
+        // count tokens after first one
+        int tokenCount = 1;
+        while (strtok(NULL, " ") != NULL) tokenCount++;
+        // printf("arg count: %d\n", tokenCount);
+
+        inputCopy = strdup(input);
+        char** args = malloc(sizeof(char*) * tokenCount);
+
+        args[0] = strtok(inputCopy, " ");
+        for(int i = 1; i < tokenCount; i++) {
+            args[i] = strtok(NULL, " ");
+            printf("arg[%d]: %s\n",i,args[i]);
+        } 
 
 
-        // Check if input matches any command
+        // Check if command matches any of our commands
         int commandFound = 0;
         for(int i = 0; i < NUM_COMMANDS; i++){
-            if(!strcmp(input, commands[i].name)){
+            if(!strcmp(command, commands[i].name)){
                 commandFound = 1;
-                commands[i].function(); // Call function (no parameters needed with global state)
+                commands[i].function(tokenCount,args); // Call function
                 break;
             }
         }
         
-        if(!commandFound && strlen(input) > 0){
-            printf("Unknown command: %s\n", input);
+        if(!commandFound){
+            printf("Unknown command: %s\n", command);
         }
         
-        if(!strcmp(input,"exit")){
+        free(inputCopy);
+        free(args);
+        if(!strcmp(command, "exit")){
             break;
         }
+        
     }
 
     free(input);

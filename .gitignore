@@ -4,6 +4,9 @@
 
 ### Vscode ###
 .vscode
+.clangd
+
+#test files
 hej.dula
 
 ### C ###

@@ -6,6 +6,7 @@ include_directories(HEADER_FILES)
 file(GLOB MAIN
     "main.c"
     "repl.c"
+    "commands.c"
     "globals/globals.c" 
     "Encryption/cipher.c"  
     "Backend/document.c"

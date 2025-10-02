@@ -20,7 +20,7 @@ void repl(){
     // char* argv;
 
     while(1){
-        printf("dulafs:%s> ", g_systemState.currentDir);  // Show current directory in prompt
+        printf("dulafs:%s> ", g_systemState.current_dir);  // Show current directory in prompt
         fflush(stdout);
         
         // Safer fgets with error checking
@@ -32,42 +32,45 @@ void repl(){
         input[strcspn(input, "\n")] = '\0'; // Remove newline character
         
         // Make a copy of input before strtok modifies it
-        char* inputCopy = strdup(input);
-        // if (inputCopy == NULL); 
+        char* input_copy = strdup(input);
+        // if (input_copy == NULL); 
         
-        char* command = strtok(inputCopy," ");
-        if (command == NULL) continue; 
+        char* command = strtok(input_copy," ");
+        if (command == NULL) {
+            free(input_copy);
+            continue;
+        }
 
         // count tokens after first one
-        int tokenCount = 1;
-        while (strtok(NULL, " ") != NULL) tokenCount++;
-        // printf("arg count: %d\n", tokenCount);
+        int token_count = 1;
+        while (strtok(NULL, " ") != NULL) token_count++;
+        // printf("arg count: %d\n", token_count);
 
-        inputCopy = strdup(input);
-        char** args = malloc(sizeof(char*) * tokenCount);
+        input_copy = strdup(input);
+        char** args = malloc(sizeof(char*) * token_count);
 
-        args[0] = strtok(inputCopy, " ");
-        for(int i = 1; i < tokenCount; i++) {
+        args[0] = strtok(input_copy, " ");
+        for(int i = 1; i < token_count; i++) {
             args[i] = strtok(NULL, " ");
             printf("arg[%d]: %s\n",i,args[i]);
         } 
 
 
         // Check if command matches any of our commands
-        int commandFound = 0;
+        int command_found = 0;
         for(int i = 0; i < NUM_COMMANDS; i++){
             if(!strcmp(command, commands[i].name)){
-                commandFound = 1;
-                commands[i].function(tokenCount,args); // Call function
+                command_found = 1;
+                commands[i].function(token_count,args); // Call function
                 break;
             }
         }
         
-        if(!commandFound){
+        if(!command_found){
             printf("Unknown command: %s\n", command);
         }
         
-        free(inputCopy);
+        free(input_copy);
         free(args);
         if(!strcmp(command, "exit")){
             break;

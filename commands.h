@@ -3,7 +3,7 @@
 
 // System state structure
 struct System_State {
-    char* currentDir;
+    char* current_dir;
 };
 
 // Command entry struct - combines name and function

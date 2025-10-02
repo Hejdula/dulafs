@@ -9,25 +9,25 @@ int main(int argc, char* argv[]){
         fprintf(stderr, "Invalid number of arguments: expected 1, got %d\nUsage: %s <pathToFile.dula>\n", argc - 1, argv[0]);
         return EINVAL;
     }
-    char* filePath = argv[1];
+    char* file_path = argv[1];
 
-    printf("Trying to open: %s\n", filePath);
+    printf("Trying to open: %s\n", file_path);
 
-    if (access(filePath, F_OK)){
-        fprintf(stderr, "File does not exist: %s\n", filePath);
+    if (access(file_path, F_OK)){
+        fprintf(stderr, "File does not exist: %s\n", file_path);
         return ENOENT;
     }
 
-    if (access(filePath, W_OK|R_OK)){
-        fprintf(stderr, "Insufficient permissions to read/write to: %s\n", filePath);
+    if (access(file_path, W_OK|R_OK)){
+        fprintf(stderr, "Insufficient permissions to read/write to: %s\n", file_path);
         return EACCES;
     }
 
-    FILE* fptr = fopen(filePath, "rw");
+    FILE* file_ptr = fopen(file_path, "rw");
 
     repl();
      
-    fclose(fptr);
+    fclose(file_ptr);
     
     return 0;
 }

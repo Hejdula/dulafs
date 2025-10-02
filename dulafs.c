@@ -36,27 +36,47 @@ int main(){
  * @return struct superblock 
  */
 struct superblock getSuperblock(int disk_size){
-
-    int true_disk_size = disk_size - sizeof(struct superblock);
-    int inode_disk_size = true_disk_size * I_NODE_RATIO;
-    int inode_bitset_bytes = inode_disk_size / sizeof(struct pseudo_inode)/8;
-    int cluster_bitset_bytes = (true_disk_size - inode_disk_size - inode_bitset_bytes)/CLUSTER_SIZE/8;
-    int cluster_disk_size = true_disk_size - (inode_disk_size + inode_bitset_bytes + cluster_bitset_bytes);
-    int cluster_count = cluster_disk_size;
+    // Calculate available space (excluding superblock)
+    int32_t available_space = disk_size - sizeof(struct superblock);
+    
+    // Calculate inode space and count
+    int32_t inode_space = available_space * I_NODE_RATIO;
+    int32_t inode_count = inode_space / sizeof(struct pseudo_inode);
+    
+    // Calculate bitmap sizes (in bytes)
+    int32_t inode_bitmap_bytes = (inode_count + 7) / 8;  // +7 for ceiling division
+    
+    // Calculate data space and cluster count
+    int32_t data_space = available_space - inode_space - inode_bitmap_bytes;
+    // Reserve space for cluster bitmap (estimate)
+    int32_t estimated_clusters = data_space / CLUSTER_SIZE;
+    int32_t cluster_bitmap_bytes = (estimated_clusters + 7) / 8;
+    
+    // Recalculate actual data space and cluster count
+    int32_t actual_data_space = data_space - cluster_bitmap_bytes;
+    int32_t cluster_count = actual_data_space / CLUSTER_SIZE;
+    
+    // Calculate addresses
+    int32_t bitmapi_start_address = sizeof(struct superblock);
+    int32_t bitmap_start_address = bitmapi_start_address + inode_bitmap_bytes;
+    int32_t inode_start_address = bitmap_start_address + cluster_bitmap_bytes;
+    int32_t data_start_address = inode_start_address + inode_space;
 
     struct superblock sup = {
         .disk_size = disk_size,
         .cluster_size = CLUSTER_SIZE,
-        .cluster_count = 0,
-        .bitmapi_start_address = 0,
-        .bitmap_start_address = 0,
-        .inode_start_address = 0,
-        .data_start_address = 0,
+        .cluster_count = cluster_count,
+        .bitmapi_start_address = bitmapi_start_address,
+        .bitmap_start_address = bitmap_start_address,
+        .inode_start_address = inode_start_address,
+        .data_start_address = data_start_address,
     };
+
     return sup;
 }
 
 
 int format(char* filename, int size){
-
+    // TODO: Implement format function
+    return 0;
 }

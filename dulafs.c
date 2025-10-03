@@ -1,11 +1,15 @@
+#include <errno.h>
+#include <stdio.h>
 #include "dulafs.h"
 #include <math.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define I_NODE_RATIO 0.1 
 #define CLUSTER_SIZE 1024 //bytes
 
-const int32_t ID_ITEM_FREE = 0;
+const int ID_ITEM_FREE = 0;
 
 void setBit(int i, uint8_t* bitset){
     int byte_index = i/8;
@@ -25,42 +29,36 @@ int readBit(int i, uint8_t* bitset){
     return bitset[byte_index] & (1 << bit_offset);
 }
 
-int main(){
-
-}
-
 /**
  * @brief Get the Superblock object
  * 
  * @param disk_size in bytes
  * @return struct superblock 
  */
-struct superblock getSuperblock(int disk_size){
+struct superblock get_superblock(int disk_size){
     // Calculate available space (excluding superblock)
-    int32_t available_space = disk_size - sizeof(struct superblock);
+    int available_space = disk_size - sizeof(struct superblock);
     
     // Calculate inode space and count
-    int32_t inode_space = available_space * I_NODE_RATIO;
-    int32_t inode_count = inode_space / sizeof(struct pseudo_inode);
+    int inode_space = available_space * I_NODE_RATIO;
+    int inode_count = inode_space / sizeof(struct pseudo_inode);
     
     // Calculate bitmap sizes (in bytes)
-    int32_t inode_bitmap_bytes = (inode_count + 7) / 8;  // +7 for ceiling division
+    int inode_bitmap_bytes = (inode_count + 7) / 8;  // +7 for ceiling division
     
     // Calculate data space and cluster count
-    int32_t data_space = available_space - inode_space - inode_bitmap_bytes;
-    // Reserve space for cluster bitmap (estimate)
-    int32_t estimated_clusters = data_space / CLUSTER_SIZE;
-    int32_t cluster_bitmap_bytes = (estimated_clusters + 7) / 8;
+    int data_space = available_space - inode_space - inode_bitmap_bytes;
+    int cluster_count = ((data_space * 8) / (CLUSTER_SIZE + 1))/8;
+    int cluster_bitmap_bytes = (cluster_count + 7) / 8;
     
-    // Recalculate actual data space and cluster count
-    int32_t actual_data_space = data_space - cluster_bitmap_bytes;
-    int32_t cluster_count = actual_data_space / CLUSTER_SIZE;
+    // Recalculate data space
+    // int actual_data_space = data_space - cluster_bitmap_bytes;
     
     // Calculate addresses
-    int32_t bitmapi_start_address = sizeof(struct superblock);
-    int32_t bitmap_start_address = bitmapi_start_address + inode_bitmap_bytes;
-    int32_t inode_start_address = bitmap_start_address + cluster_bitmap_bytes;
-    int32_t data_start_address = inode_start_address + inode_space;
+    int bitmapi_start_address = sizeof(struct superblock);
+    int bitmap_start_address = bitmapi_start_address + inode_bitmap_bytes;
+    int inode_start_address = bitmap_start_address + cluster_bitmap_bytes;
+    int data_start_address = inode_start_address + inode_space;
 
     struct superblock sup = {
         .disk_size = disk_size,
@@ -78,5 +76,22 @@ struct superblock getSuperblock(int disk_size){
 
 int format(char* filename, int size){
     // TODO: Implement format function
+    FILE* fptr = fopen(filename,"w");
+    if (fptr == NULL){
+        return 1;
+    }
+    printf("opened file");
+    struct superblock sb = get_superblock(size);
+    uint8_t *memptr = calloc(1,sizeof(char)*size);
+    memcpy(memptr, &sb, sizeof(struct superblock));
+
+    int wrote_bytes = fwrite(memptr, sizeof(uint8_t), size, fptr);
+    printf("bytes written = %d",wrote_bytes);
+    
+    free(memptr);
     return 0;
+}
+
+int main(){
+    format("hejd.ula",1000000);
 }

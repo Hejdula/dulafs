@@ -3,7 +3,7 @@
 
 // Global system state
 struct System_State g_systemState = {
-    .currentDir = "/"  // Initialize to root directory
+    .current_dir = "/"  // Initialize to root directory
 };
 
 // Command function implementations
@@ -16,7 +16,7 @@ void cmd_rmdir(int argc, char** argv) { printf("TODO: Remove directory function 
 void cmd_ls(int argc, char** argv) { printf("TODO: List function called\n"); }
 void cmd_cat(int argc, char** argv) { printf("TODO: Cat function called\n"); }
 void cmd_cd(int argc, char** argv) { printf("TODO: Change directory function called\n"); }
-void cmd_pwd(int argc, char** argv) { printf("Current directory: %s\n", g_systemState.currentDir); }
+void cmd_pwd(int argc, char** argv) { printf("Current directory: %s\n", g_systemState.current_dir); }
 void cmd_info(int argc, char** argv) { printf("TODO: Info function called\n"); }
 void cmd_incp(int argc, char** argv) { printf("TODO: Input copy function called\n"); }
 void cmd_outcp(int argc, char** argv) { printf("TODO: Output copy function called\n"); }

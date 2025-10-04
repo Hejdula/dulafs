@@ -1,7 +1,5 @@
-#include <errno.h>
 #include <stdio.h>
 #include "dulafs.h"
-#include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>

@@ -9,7 +9,8 @@ struct System_State {
 // Command entry struct - combines name and function
 struct CommandEntry {
     char* name;
-    void (*function)(int argc,char** argv);
+    int (*function)(int argc,char** argv);
+    int arg_count;
 };
 
 // Global system state declaration (defined in commands.c)

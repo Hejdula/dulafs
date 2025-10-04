@@ -50,7 +50,7 @@ void repl(){
         char** args = malloc(sizeof(char*) * token_count);
 
         args[0] = strtok(input_copy, " ");
-        for(int i = 1; i < token_count; i++) {
+        for (int i = 1; i < token_count; i++) {
             args[i] = strtok(NULL, " ");
             printf("arg[%d]: %s\n",i,args[i]);
         } 
@@ -58,21 +58,26 @@ void repl(){
 
         // Check if command matches any of our commands
         int command_found = 0;
-        for(int i = 0; i < NUM_COMMANDS; i++){
-            if(!strcmp(command, commands[i].name)){
+        for (int i = 0; i < NUM_COMMANDS; i++){
+            if (!strcmp(command, commands[i].name)){
                 command_found = 1;
-                commands[i].function(token_count,args); // Call function
+                // Call function
+                if (!commands[i].function(token_count,args)){
+                    printf("function returned with success");
+                } else {
+                    printf("funciton returned with error");
+                }; 
                 break;
             }
         }
         
-        if(!command_found){
+        if (!command_found){
             printf("Unknown command: %s\n", command);
         }
         
         free(input_copy);
         free(args);
-        if(!strcmp(command, "exit")){
+        if (!strcmp(command, "exit")){
             break;
         }
         

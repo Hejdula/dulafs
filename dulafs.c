@@ -78,9 +78,11 @@ int format(char* filename, int size){
     // TODO: Implement format function
     FILE* fptr = fopen(filename,"w");
     if (fptr == NULL){
+        printf("could not open file %s \n", filename);
         return 1;
     }
-    printf("opened file");
+
+    printf("opened file %s \n",filename);
     struct superblock sb = get_superblock(size);
     uint8_t *memptr = calloc(1,sizeof(char)*size);
     memcpy(memptr, &sb, sizeof(struct superblock));
@@ -88,10 +90,17 @@ int format(char* filename, int size){
     int wrote_bytes = fwrite(memptr, sizeof(uint8_t), size, fptr);
     printf("bytes written = %d",wrote_bytes);
     
+    fclose(fptr);
     free(memptr);
-    return 0;
-}
 
-int main(){
-    format("hejd.ula",1000000);
+    printf("\nSuperblock info:\n");
+    printf("Disk size: %d bytes\n", sb.disk_size);
+    printf("Cluster size: %d bytes\n", sb.cluster_size);
+    printf("Cluster count: %d\n", sb.cluster_count);
+    printf("Inode bitmap start address: %d\n", sb.bitmapi_start_address);
+    printf("Cluster bitmap start address: %d\n", sb.bitmap_start_address);
+    printf("Inode start address: %d\n", sb.inode_start_address);
+    printf("Data start address: %d\n", sb.data_start_address);
+
+    return 0;
 }

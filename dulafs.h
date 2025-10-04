@@ -3,8 +3,16 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 extern const int ID_ITEM_FREE;
+
+// System state structure
+struct SystemState {
+    char current_dir[256];   // Fixed buffer - safe to modify
+    char file_name[256];     // Fixed buffer - safe to modify  
+    FILE* file_ptr;
+};
 
 struct superblock {
 //   char signature[9];             // login autora FS
@@ -36,5 +44,7 @@ struct directory_item {
   int inode;      // inode odpovídající souboru
   char item_name[12]; // 8+3 + /0 C/C++ ukoncovaci string znak
 };
+
+extern struct SystemState g_system_state;
 
 #endif

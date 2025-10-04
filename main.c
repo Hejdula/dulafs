@@ -1,7 +1,9 @@
+#include <asm-generic/errno-base.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
 #include "repl.h"
+#include "dulafs.h"
 
 
 int main(int argc, char* argv[]){
@@ -17,13 +19,19 @@ int main(int argc, char* argv[]){
         fprintf(stderr, "File does not exist: %s\n", file_path);
         return ENOENT;
     }
-
     if (access(file_path, W_OK|R_OK)){
         fprintf(stderr, "Insufficient permissions to read/write to: %s\n", file_path);
         return EACCES;
     }
 
     FILE* file_ptr = fopen(file_path, "rw");
+
+    if (file_ptr == NULL){
+        fprintf(stderr, "unable to open file %s", file_path);
+        return ENOENT;
+    }
+
+    g_system_state.file_ptr = file_ptr ;
 
     repl();
      

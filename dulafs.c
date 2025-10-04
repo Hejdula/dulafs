@@ -11,6 +11,14 @@
 
 const int ID_ITEM_FREE = 0;
 
+// Global system state
+struct SystemState g_system_state = {
+    .current_dir = "/",      // Safe - copies string to buffer
+    .file_name = "",         // Initialize as empty string
+    .file_ptr = NULL
+};
+
+
 void setBit(int i, uint8_t* bitset){
     int byte_index = i/8;
     int bit_offset = i%8;
@@ -74,23 +82,16 @@ struct superblock get_superblock(int disk_size){
 }
 
 
-int format(char* filename, int size){
+int format(int size){
     // TODO: Implement format function
-    FILE* fptr = fopen(filename,"w");
-    if (fptr == NULL){
-        printf("could not open file %s \n", filename);
-        return 1;
-    }
 
-    printf("opened file %s \n",filename);
     struct superblock sb = get_superblock(size);
     uint8_t *memptr = calloc(1,sizeof(char)*size);
     memcpy(memptr, &sb, sizeof(struct superblock));
 
-    int wrote_bytes = fwrite(memptr, sizeof(uint8_t), size, fptr);
-    printf("bytes written = %d",wrote_bytes);
+    int bytes_written = fwrite(memptr, sizeof(uint8_t), size, g_system_state.file_ptr);
+    printf("bytes written = %d",bytes_written);
     
-    fclose(fptr);
     free(memptr);
 
     printf("\nSuperblock info:\n");

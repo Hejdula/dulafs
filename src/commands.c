@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "commands.h"
-#include "dulafs.c"
+#include "dulafs.h"
+#include "stdlib.h"
 
 // Command function implementations
 int cmd_format(int argc, char** argv) {
@@ -10,7 +11,13 @@ int cmd_format(int argc, char** argv) {
         return 1;
     }
 
-    return format(1000000);
+    char *endptr;
+    long size = strtol(argv[1], &endptr, 10);
+    if (*endptr != '\0' || size <= 0) {
+        fprintf(stderr, "Invalid size argument: %s\n", argv[1]);
+        return 1;
+    }
+    return format((int)size);
 }
 int cmd_cp(int argc, char** argv) { printf("TODO: Copy function called\n"); return 0; }
 int cmd_mv(int argc, char** argv) { printf("TODO: Move function called\n"); return 0; }

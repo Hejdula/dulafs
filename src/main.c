@@ -24,7 +24,7 @@ int main(int argc, char* argv[]){
         return EACCES;
     }
 
-    FILE* file_ptr = fopen(file_path, "rw");
+    FILE* file_ptr = fopen(file_path, "rb+");
 
     if (file_ptr == NULL){
         fprintf(stderr, "unable to open file %s", file_path);

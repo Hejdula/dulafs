@@ -7,16 +7,10 @@
 
 extern const int ID_ITEM_FREE;
 
-// System state structure
-struct SystemState {
-    char current_dir[256];   // Fixed buffer - safe to modify
-    char file_name[256];     // Fixed buffer - safe to modify  
-    FILE* file_ptr;
-};
-
 struct superblock {
 //   char signature[9];             // login autora FS
 //   char volume_descriptor[251];   // popis vygenerovaného FS
+  char signature[8];
   int disk_size;             // celkova velikost VFS
   int cluster_size;          // velikost clusteru
   int cluster_count;         // pocet clusteru
@@ -26,16 +20,20 @@ struct superblock {
   int data_start_address;    // adresa pocatku datovych bloku
 };
 
-struct pseudo_inode {
+// System state structure
+struct SystemState {
+  char current_dir[256];
+  char file_name[256];
+  FILE* file_ptr;
+  struct superblock sb;
+};
+
+struct inode {
   int node_id;      // ID i-uzlu, pokud ID = ID_ITEM_FREE, je polozka volna
-  bool is_directory;    // soubor, nebo adresar
+  bool is_file;    // soubor, nebo adresar
   int8_t references;    // počet odkazů na i-uzel, používá se pro hardlinky
   int file_size;    // velikost souboru v bytech
-  int direct1;      // 1. přímý odkaz na datové bloky
-  int direct2;      // 2. přímý odkaz na datové bloky
-  int direct3;      // 3. přímý odkaz na datové bloky
-  int direct4;      // 4. přímý odkaz na datové bloky
-  int direct5;      // 5. přímý odkaz na datové bloky
+  int direct[5];      // 1. přímý odkaz na datové bloky
   int indirect1;    // 1. nepřímý odkaz (odkaz - datové bloky)
   int indirect2;    // 2. nepřímý odkaz (odkaz - odkaz - datové bloky)
 };
@@ -46,5 +44,15 @@ struct directory_item {
 };
 
 extern struct SystemState g_system_state;
+
+// Function declarations
+void setBit(int i, uint8_t* bitset);
+void clearBit(int i, uint8_t* bitset);
+int readBit(int i, uint8_t* bitset);
+struct superblock get_superblock(int disk_size);
+struct inode get_inode_struct(bool is_file);
+int get_empty_index(uint8_t* bitmap_ptr);
+int create_dir();
+int format(int size);
 
 #endif

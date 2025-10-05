@@ -20,10 +20,11 @@ void repl(){
     char* input = malloc(sizeof(char) * INPUT_BUFFER_SIZE);
     // char* argv;
 
-    while(1){
+    while (1) {
+
         printf("dulafs:%s> ", g_system_state.current_dir);  // Show current directory in prompt
-        fflush(stdout);
-        
+        fflush(stdout); 
+
         // Safer fgets with error checking
         if (fgets(input, INPUT_BUFFER_SIZE, stdin) == NULL) {
             printf("\nError reading input\n");
@@ -62,8 +63,7 @@ void repl(){
             printf("arg[%d]: %s\n",i,args[i]);
         } 
 
-
-        // Check if command matches any known command
+        // Check if command matches any known command and call its function
         int command_found = 0;
         for (int i = 0; i < NUM_COMMANDS; i++){
             if (!strcmp(command, commands[i].name)){

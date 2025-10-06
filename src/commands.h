@@ -1,4 +1,3 @@
-#include <stdio.h>
 #ifndef COMMANDS_H
 #define COMMANDS_H
 
@@ -9,7 +8,7 @@ struct CommandEntry {
     int arg_count; // -1 if argument count can varry
 };
 
-// Commands array declaration (defined in commands.c)
+// Commands array declaration
 extern struct CommandEntry commands[];
 extern const int NUM_COMMANDS;
 

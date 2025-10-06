@@ -51,8 +51,9 @@ void clearBit(int i, int bitmap_offset, FILE* fptr);
 int readBit(int i, int bitmap_offset, FILE* fptr);
 struct superblock get_superblock(int disk_size);
 struct inode get_inode_struct(bool is_file);
-int get_empty_index(uint8_t* bitmap_ptr);
+int get_empty_index(int bitmap_offset, FILE* fptr);
 int create_dir();
 int format(int size);
+int test();
 
 #endif

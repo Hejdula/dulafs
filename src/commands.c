@@ -51,6 +51,7 @@ struct CommandEntry commands[] = {
     {"outcp", cmd_outcp, 0},
     {"load", cmd_load, 0},
     {"statfs", cmd_statfs, 0},
+    {"test", test, 0},
 };
 
 // Number of commands

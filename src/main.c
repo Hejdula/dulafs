@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
+#include <string.h>
 #include "repl.h"
 #include "dulafs.h"
 
@@ -32,6 +33,26 @@ int main(int argc, char* argv[]){
     }
 
     g_system_state.file_ptr = file_ptr ;
+
+    if (fread(&g_system_state.sb, sizeof(struct superblock), 1, file_ptr) != 1) {
+        fprintf(stderr, "Failed to read superblock from file\n");
+    }
+
+    if (strcmp(g_system_state.sb.signature, "HEJDULA")) {
+        printf("The file does not have signature of .ula file(HEJDULA) and may not be properly formatted, format the file with format command");
+    } else {
+        printf("✅ Valid .ula filesystem detected!\n");
+        printf("\n=== Superblock Information ===\n");
+        printf("Signature: '%.8s'\n", g_system_state.sb.signature);
+        printf("Disk size: %d bytes\n", g_system_state.sb.disk_size);
+        printf("Cluster size: %d bytes\n", g_system_state.sb.cluster_size);
+        printf("Cluster count: %d\n", g_system_state.sb.cluster_count);
+        printf("Inode bitmap start address: %d\n", g_system_state.sb.bitmapi_start_address);
+        printf("Cluster bitmap start address: %d\n", g_system_state.sb.bitmap_start_address);
+        printf("Inode start address: %d\n", g_system_state.sb.inode_start_address);
+        printf("Data start address: %d\n", g_system_state.sb.data_start_address);
+        printf("===============================\n\n");
+    }
 
     repl();
      

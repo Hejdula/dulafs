@@ -23,10 +23,13 @@ struct SystemState g_system_state = {
 void setBit(int i, int bitmap_offset, FILE* fptr){
     int byte_index = i/8;
     int bit_offset = i%8;
-    fseek(fptr, byte_index + bitmap_offset, SEEK_SET);
+    int byte_position = byte_index + bitmap_offset;
+    fseek(fptr, byte_position, SEEK_SET);
     uint8_t byte = fgetc(fptr); 
-    byte |= 1 << bit_offset;
-    fputc(byte,fptr);
+    byte |= 1 << bit_offset; 
+    fseek(fptr, byte_position, SEEK_SET);
+    fputc(byte, fptr);
+    fflush(fptr);
 }
 
 void clearBit(int i, int bitmap_offset, FILE* fptr){
@@ -35,7 +38,9 @@ void clearBit(int i, int bitmap_offset, FILE* fptr){
     fseek(fptr, byte_index + bitmap_offset, SEEK_SET);
     uint8_t byte = fgetc(fptr); 
     byte &= ~(1 << bit_offset);
+    fseek(fptr, byte_index + bitmap_offset, SEEK_SET);
     fputc(byte, fptr);
+    fflush(fptr);
 }
 
 int readBit(int i, int bitmap_offset, FILE* fptr){
@@ -101,12 +106,14 @@ struct inode get_inode_struct(bool is_file){
         return inode;
 }
 
-int get_empty_index(uint8_t* bitmap_ptr){
+int get_empty_index(int bitmap_offset, FILE* fptr){
     int byte_index = 0;
     int bit_offset = 0;
     // search for first unset bit
-    while (bitmap_ptr[byte_index] == 255) byte_index++; 
-    while (bitmap_ptr[byte_index] >> bit_offset & 1) bit_offset++; 
+    fseek(fptr, bitmap_offset, SEEK_SET);
+    uint8_t byte;
+    while ((byte = fgetc(fptr)) == 255) byte_index++;
+    while (byte >> bit_offset & 1) bit_offset++; 
 
     return byte_index * 8 + bit_offset;
 }
@@ -116,6 +123,7 @@ int create_dir(){
     return 0;
 }
 
+
 int format(int size){
     // TODO: Implement format function
 
@@ -124,6 +132,7 @@ int format(int size){
     memcpy(memptr, &sb, sizeof(struct superblock));
     g_system_state.sb = sb;
 
+    fseek(g_system_state.file_ptr, 0, SEEK_SET);
     int bytes_written = fwrite(memptr, sizeof(uint8_t), size, g_system_state.file_ptr);
     printf("bytes written = %d\n",bytes_written);
     
@@ -139,5 +148,11 @@ int format(int size){
     printf("Inode start address: %d\n", sb.inode_start_address);
     printf("Data start address: %d\n", sb.data_start_address);
 
+    return 0;
+}
+
+int test() {
+    
+    printf("=== Test Complete ===\n");
     return 0;
 }

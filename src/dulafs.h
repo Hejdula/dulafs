@@ -46,9 +46,9 @@ struct directory_item {
 extern struct SystemState g_system_state;
 
 // Function declarations
-void setBit(int i, uint8_t* bitset);
-void clearBit(int i, uint8_t* bitset);
-int readBit(int i, uint8_t* bitset);
+void setBit(int i, int bitmap_offset,FILE* fptr);
+void clearBit(int i, int bitmap_offset, FILE* fptr);
+int readBit(int i, int bitmap_offset, FILE* fptr);
 struct superblock get_superblock(int disk_size);
 struct inode get_inode_struct(bool is_file);
 int get_empty_index(uint8_t* bitmap_ptr);

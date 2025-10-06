@@ -20,22 +20,30 @@ struct SystemState g_system_state = {
 };
 
 
-void setBit(int i, uint8_t* bitset){
+void setBit(int i, int bitmap_offset, FILE* fptr){
     int byte_index = i/8;
     int bit_offset = i%8;
-    bitset[byte_index] |= 1 << bit_offset;
+    fseek(fptr, byte_index + bitmap_offset, SEEK_SET);
+    uint8_t byte = fgetc(fptr); 
+    byte |= 1 << bit_offset;
+    fputc(byte,fptr);
 }
 
-void clearBit(int i, uint8_t* bitset){
+void clearBit(int i, int bitmap_offset, FILE* fptr){
     int byte_index = i/8;
     int bit_offset = i%8;
-    bitset[byte_index] &= ~(1 << bit_offset);
+    fseek(fptr, byte_index + bitmap_offset, SEEK_SET);
+    uint8_t byte = fgetc(fptr); 
+    byte &= ~(1 << bit_offset);
+    fputc(byte, fptr);
 }
 
-int readBit(int i, uint8_t* bitset){
+int readBit(int i, int bitmap_offset, FILE* fptr){
     int byte_index = i/8;
     int bit_offset = i%8;
-    return bitset[byte_index] & (1 << bit_offset);
+    fseek(fptr, byte_index + bitmap_offset, SEEK_SET);
+    uint8_t byte = fgetc(fptr);
+    return (byte >> bit_offset) & 1;
 }
 
 /**

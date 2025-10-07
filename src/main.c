@@ -41,7 +41,7 @@ int main(int argc, char* argv[]){
     if (strcmp(g_system_state.sb.signature, "HEJDULA")) {
         printf("The file does not have signature of .ula file(HEJDULA) and may not be properly formatted, format the file with format command");
     } else {
-        printf("✅ Valid .ula filesystem detected!\n");
+        printf("Valid .ula filesystem detected!\n");
         printf("\n=== Superblock Information ===\n");
         printf("Signature: '%.8s'\n", g_system_state.sb.signature);
         printf("Disk size: %d bytes\n", g_system_state.sb.disk_size);

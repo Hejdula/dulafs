@@ -29,7 +29,7 @@ struct SystemState {
 };
 
 struct inode {
-  int node_id;      // ID i-uzlu, pokud ID = ID_ITEM_FREE, je polozka volna
+  int id;      // ID i-uzlu, pokud ID = ID_ITEM_FREE, je polozka volna
   bool is_file;    // soubor, nebo adresar
   int8_t references;    // počet odkazů na i-uzel, používá se pro hardlinky
   int file_size;    // velikost souboru v bytech
@@ -46,12 +46,12 @@ struct directory_item {
 extern struct SystemState g_system_state;
 
 // Function declarations
-void setBit(int i, int bitmap_offset,FILE* fptr);
-void clearBit(int i, int bitmap_offset, FILE* fptr);
-int readBit(int i, int bitmap_offset, FILE* fptr);
+void setBit(int i, int bitmap_offset);
+void clearBit(int i, int bitmap_offset);
+int readBit(int i, int bitmap_offset);
 struct superblock get_superblock(int disk_size);
 struct inode get_inode_struct(bool is_file);
-int get_empty_index(int bitmap_offset, FILE* fptr);
+int get_empty_index(int bitmap_offset);
 int create_dir();
 int format(int size);
 int test();

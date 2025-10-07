@@ -11,7 +11,7 @@ int cmd_format(int argc, char** argv) {
         return 1;
     }
 
-    char *endptr;
+    char* endptr;
     long size = strtol(argv[1], &endptr, 10);
     if (*endptr != '\0' || size <= 0) {
         fprintf(stderr, "Invalid size argument: %s\n", argv[1]);

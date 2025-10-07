@@ -20,36 +20,37 @@ struct SystemState g_system_state = {
 };
 
 
-void setBit(int i, int bitmap_offset, FILE* fptr){
+void set_bit(int i, int bitmap_offset){
     int byte_index = i/8;
     int bit_offset = i%8;
     int byte_position = byte_index + bitmap_offset;
-    fseek(fptr, byte_position, SEEK_SET);
-    uint8_t byte = fgetc(fptr); 
+    fseek(g_system_state.file_ptr, byte_position, SEEK_SET);
+    uint8_t byte = fgetc(g_system_state.file_ptr); 
     byte |= 1 << bit_offset; 
-    fseek(fptr, byte_position, SEEK_SET);
-    fputc(byte, fptr);
-    fflush(fptr);
+    fseek(g_system_state.file_ptr, byte_position, SEEK_SET);
+    fputc(byte, g_system_state.file_ptr);
+    fflush(g_system_state.file_ptr);
 }
 
-void clearBit(int i, int bitmap_offset, FILE* fptr){
+void clear_bit(int i, int bitmap_offset){
     int byte_index = i/8;
     int bit_offset = i%8;
-    fseek(fptr, byte_index + bitmap_offset, SEEK_SET);
-    uint8_t byte = fgetc(fptr); 
+    fseek(g_system_state.file_ptr, byte_index + bitmap_offset, SEEK_SET);
+    uint8_t byte = fgetc(g_system_state.file_ptr); 
     byte &= ~(1 << bit_offset);
-    fseek(fptr, byte_index + bitmap_offset, SEEK_SET);
-    fputc(byte, fptr);
-    fflush(fptr);
+    fseek(g_system_state.file_ptr, byte_index + bitmap_offset, SEEK_SET);
+    fputc(byte, g_system_state.file_ptr);
+    fflush(g_system_state.file_ptr);
 }
 
-int readBit(int i, int bitmap_offset, FILE* fptr){
+int read_bit(int i, int bitmap_offset){
     int byte_index = i/8;
     int bit_offset = i%8;
-    fseek(fptr, byte_index + bitmap_offset, SEEK_SET);
-    uint8_t byte = fgetc(fptr);
+    fseek(g_system_state.file_ptr, byte_index + bitmap_offset, SEEK_SET);
+    uint8_t byte = fgetc(g_system_state.file_ptr);
     return (byte >> bit_offset) & 1;
 }
+
 
 /**
  * @brief Get the Superblock object
@@ -97,30 +98,45 @@ struct superblock get_superblock(int disk_size){
     return sup;
 }
 
-struct inode get_inode_struct(bool is_file){
-        struct inode inode;
-        memset(&inode, 0, sizeof(struct inode));
-        inode.node_id = 0;
-        inode.is_file = is_file;
-        inode.references = 1;
-        return inode;
-}
-
-int get_empty_index(int bitmap_offset, FILE* fptr){
+int get_empty_index(int bitmap_offset){
     int byte_index = 0;
     int bit_offset = 0;
     // search for first unset bit
-    fseek(fptr, bitmap_offset, SEEK_SET);
+    fseek(g_system_state.file_ptr, bitmap_offset, SEEK_SET);
     uint8_t byte;
-    while ((byte = fgetc(fptr)) == 255) byte_index++;
+    while ((byte = fgetc(g_system_state.file_ptr)) == 255) byte_index++;
     while (byte >> bit_offset & 1) bit_offset++; 
 
     return byte_index * 8 + bit_offset;
 }
 
-int create_dir(){
-    struct inode inode = get_inode_struct(false);
-    return 0;
+int get_empty_cluster(){
+    int cluster_id = get_empty_index(g_system_state.sb.bitmap_start_address);
+    set_bit(cluster_id, g_system_state.sb.bitmap_start_address);
+    return cluster_id;
+}
+
+int create_dir_node(){
+    struct inode inode;
+    memset(&inode, 0, sizeof(struct inode));
+    inode.is_file = false;
+    inode.id = get_empty_index(g_system_state.sb.inode_start_address);
+    inode.direct[0] = get_empty_cluster();
+
+    return inode.id;
+}
+
+struct inode get_inode(int node_id){
+    struct inode inode;
+    fseek(g_system_state.file_ptr, node_id * sizeof(struct inode), SEEK_SET);
+    fread(&inode,sizeof(struct inode),1,g_system_state.file_ptr);
+    return inode;
+}
+
+struct directory_item* read_dir_contents(int node_id){
+    struct inode inode = get_inode(node_id);
+    if(inode.is_file){
+    }
 }
 
 
@@ -152,7 +168,7 @@ int format(int size){
 }
 
 int test() {
-    
+
     printf("=== Test Complete ===\n");
     return 0;
 }

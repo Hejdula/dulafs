@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+#define DIRECT_CLUSTER_COUNT 5
+
 extern const int ID_ITEM_FREE;
 
 struct superblock {
@@ -33,7 +35,7 @@ struct inode {
   bool is_file;    // soubor, nebo adresar
   int8_t references;    // počet odkazů na i-uzel, používá se pro hardlinky
   int file_size;    // velikost souboru v bytech
-  int direct[5];      // 1. přímý odkaz na datové bloky
+  int direct[DIRECT_CLUSTER_COUNT];      // 1. přímý odkaz na datové bloky
   int indirect1;    // 1. nepřímý odkaz (odkaz - datové bloky)
   int indirect2;    // 2. nepřímý odkaz (odkaz - odkaz - datové bloky)
 };

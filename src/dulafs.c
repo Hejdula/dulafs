@@ -105,8 +105,7 @@ int get_empty_index(int bitmap_offset){
     fseek(g_system_state.file_ptr, bitmap_offset, SEEK_SET);
     uint8_t byte;
     while ((byte = fgetc(g_system_state.file_ptr)) == 255) byte_index++;
-    while (byte >> bit_offset & 1) bit_offset++; 
-
+    while (byte >> bit_offset & 1) bit_offset++;
     return byte_index * 8 + bit_offset;
 }
 
@@ -133,12 +132,38 @@ struct inode get_inode(int node_id){
     return inode;
 }
 
-struct directory_item* read_dir_contents(int node_id){
-    struct inode inode = get_inode(node_id);
-    if(inode.is_file){
+int* get_node_clusters(struct inode* inode){
+    int cluster_count = (inode->file_size+CLUSTER_SIZE-1)/CLUSTER_SIZE;
+    int* carr = malloc(cluster_count*sizeof(int));
+    for (int i = 0; i < cluster_count && i < DIRECT_CLUSTER_COUNT; i++){
+        if (inode->direct[i]) carr[i] = inode->direct[i];
+        else break;
     }
+    return carr;
 }
 
+uint8_t* get_node_data(struct inode* inode){
+    int* cluster_arr = get_node_clusters(inode); 
+    int cluster_count = (inode->file_size+CLUSTER_SIZE-1)/CLUSTER_SIZE;
+    uint8_t* data = malloc(inode->file_size);
+
+    int bytes_to_read = CLUSTER_SIZE;
+    for(int i = 0; i < cluster_count; i++){    
+        if((i + 1) * CLUSTER_SIZE > inode->file_size){
+            bytes_to_read = inode->file_size - i * CLUSTER_SIZE;
+        }
+        fseek(g_system_state.file_ptr, cluster_arr[i] * CLUSTER_SIZE + g_system_state.sb.data_start_address, SEEK_SET);
+        fread(data + CLUSTER_SIZE * i, bytes_to_read, 1, g_system_state.file_ptr);
+    }
+    free(cluster_arr);
+    return data;
+};
+
+// int read_dir_contents(struct directory_item* dptr,int node_id){
+//     struct inode inode = get_inode(node_id);
+//     struct directory_item* data = (struct directory_item*) get_node_data(&inode);
+//     return 0;
+// }
 
 int format(int size){
     // TODO: Implement format function

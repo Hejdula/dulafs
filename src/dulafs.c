@@ -16,7 +16,7 @@ struct SystemState g_system_state = {
     .curr_dir = "/",      // Safe - copies string to buffer
     .file_name = "",         // Initialize as empty string
     .file_ptr = NULL,
-    .curr_node_id = 0,
+    .curr_node_id = ROOT_NODE,
     .sb = {0}
 };
 
@@ -245,7 +245,7 @@ int format(int size){
     printf("bytes written = %d\n",bytes_written); 
     free(memptr);
 
-    create_dir_node(0);
+    create_dir_node(ROOT_NODE);
 
     printf("\nSuperblock info:\n");
     printf("Signature: '%.8s'\n", sb.signature);

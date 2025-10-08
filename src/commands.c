@@ -2,6 +2,7 @@
 #include "commands.h"
 #include "dulafs.h"
 #include "stdlib.h"
+#include <string.h>
 
 // Command function implementations
 int cmd_format(int argc, char** argv) {
@@ -22,12 +23,38 @@ int cmd_format(int argc, char** argv) {
 int cmd_cp(int argc, char** argv) { printf("TODO: Copy function called\n"); return 0; }
 int cmd_mv(int argc, char** argv) { printf("TODO: Move function called\n"); return 0; }
 int cmd_rm(int argc, char** argv) { printf("TODO: Remove function called\n"); return 0; }
-int cmd_mkdir(int argc, char** argv) { printf("TODO: Make directory function called\n"); return 0; }
+
+int cmd_mkdir(int argc, char** argv) {
+    int new_node_id = create_dir_node(g_system_state.curr_node_id); 
+    struct directory_item dir_record = {0};
+    dir_record.inode = new_node_id;
+    strncpy(dir_record.item_name, argv[1], sizeof(dir_record.item_name) - 1);
+    dir_record.item_name[sizeof(dir_record.item_name) - 1] = '\0';
+    struct inode curr_node = get_inode(g_system_state.curr_node_id); 
+    add_record_to_dir(dir_record, &curr_node);
+
+    return EXIT_SUCCESS;
+}
+
 int cmd_rmdir(int argc, char** argv) { printf("TODO: Remove directory function called\n"); return 0; }
-int cmd_ls(int argc, char** argv) { printf("TODO: List function called\n"); return 0; }
+
+int cmd_ls(int argc, char** argv) {
+    struct inode curr_inode = get_inode(g_system_state.curr_node_id);
+    struct directory_item* dir_content = (struct directory_item*) get_node_data(&curr_inode);
+    int record_count = curr_inode.file_size / sizeof(struct directory_item);
+    for (int i = 0; i < record_count; i++){
+        if (dir_content[i].item_name[0]){
+            printf("%s : %d\n",dir_content[i].item_name, dir_content[i].inode);
+        }
+    }
+
+    free(dir_content);
+    return EXIT_SUCCESS;
+}
+
 int cmd_cat(int argc, char** argv) { printf("TODO: Cat function called\n"); return 0; }
 int cmd_cd(int argc, char** argv) { printf("TODO: Change directory function called\n"); return 0; }
-int cmd_pwd(int argc, char** argv) { printf("Current directory: %s\n", g_system_state.current_dir); return 0; }
+int cmd_pwd(int argc, char** argv) { printf("Current directory: %s\n", g_system_state.curr_dir); return 0; }
 int cmd_info(int argc, char** argv) { printf("TODO: Info function called\n"); return 0; }
 int cmd_incp(int argc, char** argv) { printf("TODO: Input copy function called\n"); return 0; }
 int cmd_outcp(int argc, char** argv) { printf("TODO: Output copy function called\n"); return 0; }

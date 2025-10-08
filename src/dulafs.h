@@ -24,9 +24,10 @@ struct superblock {
 
 // System state structure
 struct SystemState {
-  char current_dir[256];
+  char curr_dir[256];
   char file_name[256];
   FILE* file_ptr;
+  int curr_node_id;
   struct superblock sb;
 };
 
@@ -54,7 +55,10 @@ int readBit(int i, int bitmap_offset);
 struct superblock get_superblock(int disk_size);
 struct inode get_inode_struct(bool is_file);
 int get_empty_index(int bitmap_offset);
-int create_dir();
+int create_dir_node(int up_ref);
+int add_record_to_dir(struct directory_item record, struct inode* inode);
+uint8_t* get_node_data(struct inode* inode);
+struct inode get_inode(int node_id);
 int format(int size);
 int test();
 

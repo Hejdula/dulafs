@@ -22,7 +22,7 @@ void repl(){
 
     while (1) {
 
-        printf("dulafs:%s> ", g_system_state.current_dir);  // Show current directory in prompt
+        printf("dulafs:%s> ", g_system_state.curr_dir);  // Show current directory in prompt
         fflush(stdout); 
 
         // Safer fgets with error checking

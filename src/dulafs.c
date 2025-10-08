@@ -13,9 +13,10 @@ const int ID_ITEM_FREE = 0;
 
 // Global system state
 struct SystemState g_system_state = {
-    .current_dir = "/",      // Safe - copies string to buffer
+    .curr_dir = "/",      // Safe - copies string to buffer
     .file_name = "",         // Initialize as empty string
     .file_ptr = NULL,
+    .curr_node_id = 0,
     .sb = {0}
 };
 
@@ -97,6 +98,13 @@ struct superblock get_superblock(int disk_size){
 
 
     return sup;
+}
+
+void write_inode(struct inode* inode){
+    long offset = g_system_state.sb.inode_start_address + inode->id * sizeof(struct inode);
+    fseek(g_system_state.file_ptr, offset, SEEK_SET);
+    fwrite(inode, sizeof(struct inode), 1, g_system_state.file_ptr);
+    fflush(g_system_state.file_ptr);
 }
 
 int get_empty_index(int bitmap_offset){
@@ -194,7 +202,9 @@ int add_record_to_dir(struct directory_item record, struct inode* inode){
     printf("final offset in addrecord to dir: %d\n", final_offset);
     fseek(g_system_state.file_ptr, final_offset, SEEK_SET);
     fwrite(&record, sizeof(struct directory_item), 1, g_system_state.file_ptr);
+
     inode->file_size += sizeof(struct directory_item);
+    write_inode(inode);
 
     free(node_data);
     return EXIT_SUCCESS;
@@ -208,11 +218,11 @@ int create_dir_node(int up_ref_id){
 
     struct directory_item self_ref = {inode.id,".\0\0\0\0\0\0\0\0\0\0\0"}; 
     struct directory_item up_ref = {up_ref_id,"..\0\0\0\0\0\0\0\0\0\0"};
-    struct directory_item random_stuff = {up_ref_id,"fulnamefile"};
 
     add_record_to_dir(self_ref, &inode);
     add_record_to_dir(up_ref, &inode);
-    add_record_to_dir(random_stuff, &inode);
+
+    write_inode(&inode);
 
     return inode.id;
 }
@@ -224,7 +234,6 @@ int create_dir_node(int up_ref_id){
 // }
 
 int format(int size){
-    // TODO: Implement format function
 
     struct superblock sb = get_superblock(size);
     uint8_t *memptr = calloc(1,sizeof(char)*size);
@@ -233,9 +242,10 @@ int format(int size){
 
     fseek(g_system_state.file_ptr, 0, SEEK_SET);
     int bytes_written = fwrite(memptr, sizeof(uint8_t), size, g_system_state.file_ptr);
-    printf("bytes written = %d\n",bytes_written);
-    
+    printf("bytes written = %d\n",bytes_written); 
     free(memptr);
+
+    create_dir_node(0);
 
     printf("\nSuperblock info:\n");
     printf("Signature: '%.8s'\n", sb.signature);
@@ -252,7 +262,6 @@ int format(int size){
 
 int test() {
 
-    create_dir_node(254);
     printf("=== Test Complete ===\n");
     return 0;
 }

@@ -6,6 +6,7 @@
 ### Vscode ###
 .vscode
 .clangd
+.cache/
 
 #test files
 hej.dula

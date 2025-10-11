@@ -53,8 +53,82 @@ int cmd_ls(int argc, char** argv) {
 }
 
 int cmd_cat(int argc, char** argv) { printf("TODO: Cat function called\n"); return 0; }
-int cmd_cd(int argc, char** argv) { printf("TODO: Change directory function called\n"); return 0; }
-int cmd_pwd(int argc, char** argv) { printf("Current directory: %s\n", g_system_state.curr_dir); return 0; }
+
+int cmd_cd(int argc, char** argv) {
+    struct inode curr_inode = get_inode(g_system_state.curr_node_id);
+    struct directory_item* dir_content = (struct directory_item*) get_node_data(&curr_inode);
+    int record_count = curr_inode.file_size / sizeof(struct directory_item);
+    int record_found = 0;
+    for (int i = 0; i < record_count; i++){
+        if (!strcmp(argv[1], dir_content[i].item_name)){
+            struct inode found_node = get_inode(dir_content[i].inode);
+            if (found_node.is_file){
+                printf("%s is file, not a directory", argv[1]);
+                free(dir_content);
+                return EXIT_FAILURE;
+            }
+            record_found = 1;
+            g_system_state.curr_node_id = dir_content[i].inode;
+            break;
+        }
+    }    
+    free(dir_content);
+     
+    if (!record_found){
+        printf("No such directory found");
+        return EXIT_FAILURE;
+    }
+
+    printf("current inode: %d", g_system_state.curr_node_id);
+
+
+    return EXIT_SUCCESS;
+}
+
+int cmd_pwd(int argc, char** argv) {
+    struct inode curr_inode = get_inode(g_system_state.curr_node_id);
+    int prev_inode_id = -1;
+    char path[MAX_DIR_PATH];
+    char temp[MAX_DIR_PATH];
+    path[0] = '\0';
+
+    while(prev_inode_id != ROOT_NODE){
+        struct directory_item* dir_content = (struct directory_item*) get_node_data(&curr_inode);
+
+        if(prev_inode_id != -1){ 
+            int record_found = 0;
+            int record_count = curr_inode.file_size / sizeof(struct directory_item);
+
+            //find name of the previous inode and prepend it to path with '/'
+            for (int i = 0; i < record_count; i++){
+                if (dir_content[i].inode == prev_inode_id){
+                    struct inode found_node = get_inode(dir_content[i].inode);
+                    strcpy(temp, "/");
+                    strlcat(temp, dir_content[i].item_name, MAX_DIR_PATH);
+                    strlcat(temp, path, MAX_DIR_PATH);
+                    strlcpy(path, temp, MAX_DIR_PATH);
+                    record_found = 1;
+                    break;
+                }
+            }    
+
+            if(!record_found){
+                printf("path: %s\n", path);
+                fprintf(stderr, "error: could not find inode in upper directory\n");
+                free(dir_content);
+                return EXIT_FAILURE;
+            }
+        }
+        prev_inode_id = curr_inode.id;
+        curr_inode = get_inode(dir_content[1].inode);
+        free(dir_content);
+        
+    }
+    printf("path: %s \n", path);
+
+    return EXIT_SUCCESS;
+}
+
 int cmd_info(int argc, char** argv) { printf("TODO: Info function called\n"); return 0; }
 int cmd_incp(int argc, char** argv) { printf("TODO: Input copy function called\n"); return 0; }
 int cmd_outcp(int argc, char** argv) { printf("TODO: Output copy function called\n"); return 0; }
@@ -71,7 +145,7 @@ struct CommandEntry commands[] = {
     {"rmdir", cmd_rmdir, 1},
     {"ls", cmd_ls, -1},
     {"cat", cmd_cat, 0},
-    {"cd", cmd_cd, 0},
+    {"cd", cmd_cd, 1},
     {"pwd", cmd_pwd, 0},
     {"info", cmd_info, 0},
     {"incp", cmd_incp, 0},

@@ -5,7 +5,10 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+#define MAX_DIR_PATH 1024
 #define DIRECT_CLUSTER_COUNT 5
+#define ROOT_NODE 0
+#define DIR_NAME_SIZE 12
 
 extern const int ID_ITEM_FREE;
 
@@ -24,8 +27,7 @@ struct superblock {
 
 // System state structure
 struct SystemState {
-  char curr_dir[256];
-  char file_name[256];
+  char curr_dir[1024];
   FILE* file_ptr;
   int curr_node_id;
   struct superblock sb;
@@ -43,7 +45,7 @@ struct inode {
 
 struct directory_item {
   int inode;      // inode odpovídající souboru
-  char item_name[12]; // 8+3 + /0 C/C++ ukoncovaci string znak
+  char item_name[DIR_NAME_SIZE]; // 8+3 + /0 C/C++ ukoncovaci string znak
 };
 
 extern struct SystemState g_system_state;

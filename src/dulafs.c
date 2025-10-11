@@ -6,7 +6,6 @@
 
 #define I_NODE_RATIO 0.1 
 #define CLUSTER_SIZE 1024
-#define ROOT_NODE 0
 
 
 const int ID_ITEM_FREE = 0;
@@ -14,7 +13,6 @@ const int ID_ITEM_FREE = 0;
 // Global system state
 struct SystemState g_system_state = {
     .curr_dir = "/",      // Safe - copies string to buffer
-    .file_name = "",         // Initialize as empty string
     .file_ptr = NULL,
     .curr_node_id = ROOT_NODE,
     .sb = {0}
@@ -135,7 +133,7 @@ int assign_empty_cluster(){
 struct inode get_inode(int node_id){
     struct inode inode;
     fseek(g_system_state.file_ptr, g_system_state.sb.inode_start_address + node_id * sizeof(struct inode), SEEK_SET);
-    fread(&inode,sizeof(struct inode),1,g_system_state.file_ptr);
+    fread(&inode, sizeof(struct inode), 1, g_system_state.file_ptr);
     return inode;
 }
 
@@ -164,6 +162,7 @@ uint8_t* get_node_data(struct inode* inode){
         fseek(g_system_state.file_ptr, cluster_arr[i] * CLUSTER_SIZE + g_system_state.sb.data_start_address, SEEK_SET);
         fread(data + CLUSTER_SIZE * i, bytes_to_read, 1, g_system_state.file_ptr);
     }
+    free(cluster_arr);
     return data;
 };
 

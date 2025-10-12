@@ -22,7 +22,7 @@ void repl(){
 
     while (1) {
 
-        printf("dulafs:%s> ", g_system_state.curr_dir);  // Show current directory in prompt
+        printf("dulafs:%s> ", g_system_state.working_dir);  // Show current directory in prompt
         fflush(stdout); 
 
         // Safer fgets with error checking
@@ -78,7 +78,7 @@ void repl(){
                 // Call function
                 int ret_val =  commands[i].function(token_count,args);
                 if (!ret_val){
-                    printf("function returned with success\n");
+                    // printf("function returned with success\n");
                 } else {
                     printf("funciton returned with error\n");
                 };

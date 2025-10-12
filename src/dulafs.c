@@ -12,7 +12,7 @@ const int ID_ITEM_FREE = 0;
 
 // Global system state
 struct SystemState g_system_state = {
-    .curr_dir = "/",      // Safe - copies string to buffer
+    .working_dir = "/",      // Safe - copies string to buffer
     .file_ptr = NULL,
     .curr_node_id = ROOT_NODE,
     .sb = {0}
@@ -138,6 +138,46 @@ struct inode get_inode(int node_id){
     return inode;
 }
 
+char* inode_to_path(int inode_id){
+    struct inode curr_inode = get_inode(inode_id);
+    int prev_inode_id = -1;
+    char* path = malloc(MAX_DIR_PATH);
+    if (!path) return NULL;
+    path[0] = '\0';
+    while (prev_inode_id != ROOT_NODE) {
+        struct directory_item* dir_content = (struct directory_item*) get_node_data(&curr_inode);
+        if (prev_inode_id != -1) {
+            int record_found = 0;
+            int record_count = curr_inode.file_size / sizeof(struct directory_item);
+            for (int i = 0; i < record_count; i++) {
+                if (dir_content[i].inode == prev_inode_id) {
+                    // Prepend the name to the path
+                    char temp[MAX_DIR_PATH];
+                    snprintf(temp, sizeof(temp), "/%s%s", dir_content[i].item_name, path);
+                    strlcpy(path, temp, MAX_DIR_PATH);
+                    record_found = 1;
+                    break;
+                }
+            }
+            if (!record_found) {
+                // Could not find name in parent
+                free(path);
+                free(dir_content);
+                return NULL;
+            }
+        }
+        prev_inode_id = curr_inode.id;
+        curr_inode = get_inode(dir_content[0].inode);
+
+        free(dir_content);
+    }
+    // If path is empty, we are at root
+    if (path[0] == '\0') {
+        strlcpy(path, "/", MAX_DIR_PATH);
+    }
+    return path;
+}
+
 int path_to_inode(char* path){
     if (strlen(path) >= MAX_DIR_PATH){
         fprintf(stderr, "Path too long\n");
@@ -260,11 +300,11 @@ int create_dir_node(int up_ref_id){
     inode.is_file = false;
     inode.id = assign_empty_inode();
 
-    struct directory_item self_ref = {inode.id,".\0\0\0\0\0\0\0\0\0\0\0"}; 
     struct directory_item up_ref = {up_ref_id,"..\0\0\0\0\0\0\0\0\0\0"};
+    struct directory_item self_ref = {inode.id,".\0\0\0\0\0\0\0\0\0\0\0"}; 
 
-    add_record_to_dir(self_ref, &inode);
     add_record_to_dir(up_ref, &inode);
+    add_record_to_dir(self_ref, &inode);
 
     write_inode(&inode);
 
@@ -299,12 +339,6 @@ int format(int size){
 }
 
 int test() {
-    printf("id of hello/hi/ahoj: %d\n", path_to_inode("hello/hi/ahoj"));
-    printf("id of hello/hi: %d\n", path_to_inode("hello/hi"));
-    printf("id of hello: %d\n", path_to_inode("hello"));
-    printf("id of /: %d\n", path_to_inode("/"));
-    printf("id of ./: %d\n", path_to_inode("./"));
-    printf("id of ./hello/..: %d\n", path_to_inode("./hello/.."));
     printf("=== Test Complete ===\n");
     return 0;
 }

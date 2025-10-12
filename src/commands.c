@@ -66,51 +66,17 @@ int cmd_cd(int argc, char** argv) {
     }
 
     g_system_state.curr_node_id = new_node_id;
+    char* new_path = inode_to_path(g_system_state.curr_node_id);
+    strlcpy(g_system_state.working_dir, new_path, sizeof(g_system_state.working_dir) - 1);
+    free(new_path);
 
     return EXIT_SUCCESS;
 }
 
 int cmd_pwd(int argc, char** argv) {
-    struct inode curr_inode = get_inode(g_system_state.curr_node_id);
-    int prev_inode_id = -1;
-    char path[MAX_DIR_PATH];
-    char temp[MAX_DIR_PATH];
-    path[0] = '\0';
-
-    while(prev_inode_id != ROOT_NODE){
-        struct directory_item* dir_content = (struct directory_item*) get_node_data(&curr_inode);
-
-        if(prev_inode_id != -1){ 
-            int record_found = 0;
-            int record_count = curr_inode.file_size / sizeof(struct directory_item);
-
-            //find name of the previous inode and prepend it to path with '/'
-            for (int i = 0; i < record_count; i++){
-                if (dir_content[i].inode == prev_inode_id){
-                    struct inode found_node = get_inode(dir_content[i].inode);
-                    strcpy(temp, "/");
-                    strlcat(temp, dir_content[i].item_name, MAX_DIR_PATH);
-                    strlcat(temp, path, MAX_DIR_PATH);
-                    strlcpy(path, temp, MAX_DIR_PATH);
-                    record_found = 1;
-                    break;
-                }
-            }    
-
-            if(!record_found){
-                printf("path: %s\n", path);
-                fprintf(stderr, "error: could not find inode in upper directory\n");
-                free(dir_content);
-                return EXIT_FAILURE;
-            }
-        }
-        prev_inode_id = curr_inode.id;
-        curr_inode = get_inode(dir_content[1].inode);
-        free(dir_content);
-        
-    }
-    printf("path: %s \n", path);
-
+    char* path = inode_to_path(g_system_state.curr_node_id);
+    printf("working directory: %s\n", path);
+    free(path);
     return EXIT_SUCCESS;
 }
 

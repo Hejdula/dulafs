@@ -27,7 +27,7 @@ struct superblock {
 
 // System state structure
 struct SystemState {
-  char curr_dir[1024];
+  char working_dir[1024];
   FILE* file_ptr;
   int curr_node_id;
   struct superblock sb;
@@ -62,6 +62,7 @@ int add_record_to_dir(struct directory_item record, struct inode* inode);
 uint8_t* get_node_data(struct inode* inode);
 struct inode get_inode(int node_id);
 int format(int size);
+char* inode_to_path(int inode_id);
 int path_to_inode(char* path);
 int test();
 

@@ -61,6 +61,11 @@ int cmd_mkdir(int argc, char** argv) {
 
 int cmd_rmdir(int argc, char** argv) {
 
+    if (!strcmp(argv[1],".") || !strcmp(argv[1],"..")){
+        printf("can not remove \".\" or \"..\" from directory");
+        return EXIT_FAILURE;
+    }
+
     char target_path[MAX_DIR_PATH];
     strcpy(target_path, argv[1]);
     

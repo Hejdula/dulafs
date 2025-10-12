@@ -222,15 +222,65 @@ int path_to_inode(char* path){
 }
 
 int* get_node_clusters(struct inode* inode){
-    int cluster_count = (inode->file_size+CLUSTER_SIZE-1)/CLUSTER_SIZE;
+    int cluster_count = (inode->file_size + CLUSTER_SIZE - 1) / CLUSTER_SIZE;
     if(!cluster_count){
         return NULL;
     }
-    int* carr = malloc(cluster_count*sizeof(int));
-    for (int i = 0; i < cluster_count && i < DIRECT_CLUSTER_COUNT; i++){
+    int* carr = malloc(cluster_count * sizeof(int));
+    if (!carr) return NULL;
+    int i;
+    for (i = 0; i < cluster_count && i < DIRECT_CLUSTER_COUNT; i++){
         carr[i] = inode->direct[i];
     }
-    // TODO: handle indirect stuff
+
+    if (!inode->indirect1) return carr;
+
+    int max_1st_indirect = CLUSTER_SIZE / sizeof(int);
+    
+    // read 1st level indirect
+    int* indirect_arr = malloc(CLUSTER_SIZE);
+    if (!indirect_arr) { free(carr); return NULL; }
+
+    int offset = g_system_state.sb.data_start_address + inode->indirect1 * CLUSTER_SIZE;
+    fseek(g_system_state.file_ptr, offset, SEEK_SET);
+    fread(indirect_arr, CLUSTER_SIZE, 1, g_system_state.file_ptr);
+    
+    // iterate through the clusters
+    for (i = i; i < cluster_count && i < (max_1st_indirect + DIRECT_CLUSTER_COUNT); i++){
+        carr[i] = indirect_arr[i - DIRECT_CLUSTER_COUNT];
+    }
+
+
+    if (!inode->indirect2) {
+        free(indirect_arr);
+        return carr;
+    }
+    int max_2nd_indirect = max_1st_indirect * max_1st_indirect;
+
+    // read first page of 2nd level indirect
+    int* indirect_clusters = malloc(CLUSTER_SIZE);
+    if (!indirect_clusters) { free(carr); free(indirect_arr); return NULL; }
+
+    offset = g_system_state.sb.data_start_address + inode->indirect2 * CLUSTER_SIZE;
+    fseek(g_system_state.file_ptr, offset, SEEK_SET);
+    fread(indirect_clusters, CLUSTER_SIZE, 1, g_system_state.file_ptr);
+
+    int max_total = DIRECT_CLUSTER_COUNT + max_1st_indirect + max_2nd_indirect;
+    
+    // iterate through pages of 1st level indirect
+    for (int indirect_index = 0; i < cluster_count && i < cluster_count && i < max_total; indirect_index++){
+        offset = g_system_state.sb.data_start_address + indirect_clusters[indirect_index] * CLUSTER_SIZE;
+        fseek(g_system_state.file_ptr, offset, SEEK_SET);
+        fread(indirect_arr, CLUSTER_SIZE, 1, g_system_state.file_ptr);
+
+        // iterate through the clusters
+        for (int j = 0; j < max_1st_indirect && i < cluster_count; j++, i++){
+            carr[i] = indirect_arr[j];
+        }
+    }
+
+    free(indirect_arr);
+    free(indirect_clusters);
     return carr;
 }
 
@@ -240,8 +290,8 @@ uint8_t* get_node_data(struct inode* inode){
     int cluster_count = (inode->file_size+CLUSTER_SIZE-1)/CLUSTER_SIZE;
     uint8_t* data = malloc(inode->file_size);
 
-    int bytes_to_read = CLUSTER_SIZE;
     for (int i = 0; i < cluster_count; i++){    
+        int bytes_to_read = CLUSTER_SIZE;
         if ((i + 1) * CLUSTER_SIZE > inode->file_size){
             bytes_to_read = inode->file_size - i * CLUSTER_SIZE;
         }
@@ -385,7 +435,6 @@ int format(int size){
 }
 
 int test() {
-    delete_item(ROOT_NODE, "test");
     printf("=== Test Complete ===\n");
     return 0;
 }

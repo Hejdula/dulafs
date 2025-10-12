@@ -55,32 +55,17 @@ int cmd_ls(int argc, char** argv) {
 int cmd_cat(int argc, char** argv) { printf("TODO: Cat function called\n"); return 0; }
 
 int cmd_cd(int argc, char** argv) {
-    struct inode curr_inode = get_inode(g_system_state.curr_node_id);
-    struct directory_item* dir_content = (struct directory_item*) get_node_data(&curr_inode);
-    int record_count = curr_inode.file_size / sizeof(struct directory_item);
-    int record_found = 0;
-    for (int i = 0; i < record_count; i++){
-        if (!strcmp(argv[1], dir_content[i].item_name)){
-            struct inode found_node = get_inode(dir_content[i].inode);
-            if (found_node.is_file){
-                printf("%s is file, not a directory", argv[1]);
-                free(dir_content);
-                return EXIT_FAILURE;
-            }
-            record_found = 1;
-            g_system_state.curr_node_id = dir_content[i].inode;
-            break;
-        }
-    }    
-    free(dir_content);
-     
-    if (!record_found){
-        printf("No such directory found");
+    int new_node_id = path_to_inode(argv[1]);
+    if (new_node_id == -1){
+        return EXIT_FAILURE;
+    }
+    struct inode node = get_inode(new_node_id);
+    if (node.is_file){
+        fprintf(stderr, "%s not a directory", argv[1]);
         return EXIT_FAILURE;
     }
 
-    printf("current inode: %d", g_system_state.curr_node_id);
-
+    g_system_state.curr_node_id = new_node_id;
 
     return EXIT_SUCCESS;
 }

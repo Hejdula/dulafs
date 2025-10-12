@@ -140,7 +140,7 @@ struct inode get_inode(int node_id){
 
 int path_to_inode(char* path){
     if (strlen(path) >= MAX_DIR_PATH){
-        fprintf(stderr,"Path too long");
+        fprintf(stderr, "Path too long\n");
         return -1;
     }
 
@@ -156,16 +156,16 @@ int path_to_inode(char* path){
         // if(!strcmp(token, ".")){ continue; }
         struct inode inode = get_inode(curr_node_id);
         if (inode.is_file){
-            fprintf(stderr, "file: \"%s\n can not be traversed like a directory", token);
+            fprintf(stderr, "file: \"%s\" can not be traversed like a directory\n", token);
             return -1;
         }
         struct directory_item* node_data = (struct directory_item*) get_node_data(&inode);
         int record_count = inode.file_size / sizeof(struct directory_item);
-        int node_found = 1;
+        int node_found = 0;
         for (int i = 0; i < record_count; i++){
-            curr_node_id = node_data[i].inode;
-            node_found = 1;
             if (!strcmp(token, node_data[i].item_name)){
+                curr_node_id = node_data[i].inode;
+                node_found = 1;
                 break;
             }
         }
@@ -173,7 +173,7 @@ int path_to_inode(char* path){
         free(node_data);
 
         if (!node_found){
-            printf(stderr, "path does not exist: %s", path);
+            fprintf(stderr, "path does not exist: %s\n", path);
             return -1;
         }
     }

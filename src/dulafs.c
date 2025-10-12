@@ -105,6 +105,7 @@ void write_inode(struct inode* inode){
     fflush(g_system_state.file_ptr);
 }
 
+
 int get_empty_index(int bitmap_offset){
     int byte_index = 0;
     int bit_offset = 0;
@@ -137,6 +138,49 @@ struct inode get_inode(int node_id){
     return inode;
 }
 
+int path_to_inode(char* path){
+    if (strlen(path) >= MAX_DIR_PATH){
+        fprintf(stderr,"Path too long");
+        return -1;
+    }
+
+    int curr_node_id;
+    if (path[0] == '/') curr_node_id = ROOT_NODE;
+    else curr_node_id = g_system_state.curr_node_id ;
+
+
+    char path_copy[MAX_DIR_PATH];
+    strncpy(path_copy, path, MAX_DIR_PATH);
+    // process tokens by one of the path
+    for (char* token = strtok(path_copy, "/"); token != NULL; token = strtok(NULL, "/")){
+        // if(!strcmp(token, ".")){ continue; }
+        struct inode inode = get_inode(curr_node_id);
+        if (inode.is_file){
+            fprintf(stderr, "file: \"%s\n can not be traversed like a directory", token);
+            return -1;
+        }
+        struct directory_item* node_data = (struct directory_item*) get_node_data(&inode);
+        int record_count = inode.file_size / sizeof(struct directory_item);
+        int node_found = 1;
+        for (int i = 0; i < record_count; i++){
+            curr_node_id = node_data[i].inode;
+            node_found = 1;
+            if (!strcmp(token, node_data[i].item_name)){
+                break;
+            }
+        }
+    
+        free(node_data);
+
+        if (!node_found){
+            printf(stderr, "path does not exist: %s", path);
+            return -1;
+        }
+    }
+    
+    return curr_node_id;
+}
+
 int* get_node_clusters(struct inode* inode){
     int cluster_count = (inode->file_size+CLUSTER_SIZE-1)/CLUSTER_SIZE;
     if(!cluster_count){
@@ -150,6 +194,7 @@ int* get_node_clusters(struct inode* inode){
 }
 
 uint8_t* get_node_data(struct inode* inode){
+    if (!inode->file_size) return NULL;
     int* cluster_arr = get_node_clusters(inode);
     int cluster_count = (inode->file_size+CLUSTER_SIZE-1)/CLUSTER_SIZE;
     uint8_t* data = malloc(inode->file_size);
@@ -226,12 +271,6 @@ int create_dir_node(int up_ref_id){
     return inode.id;
 }
 
-// int read_dir_contents(struct directory_item* dptr,int node_id){
-//     struct inode inode = get_inode(node_id);
-//     struct directory_item* data = (struct directory_item*) get_node_data(&inode);
-//     return 0;
-// }
-
 int format(int size){
 
     struct superblock sb = get_superblock(size);
@@ -260,7 +299,12 @@ int format(int size){
 }
 
 int test() {
-
+    printf("id of hello/hi/ahoj: %d\n", path_to_inode("hello/hi/ahoj"));
+    printf("id of hello/hi: %d\n", path_to_inode("hello/hi"));
+    printf("id of hello: %d\n", path_to_inode("hello"));
+    printf("id of /: %d\n", path_to_inode("/"));
+    printf("id of ./: %d\n", path_to_inode("./"));
+    printf("id of ./hello/..: %d\n", path_to_inode("./hello/.."));
     printf("=== Test Complete ===\n");
     return 0;
 }

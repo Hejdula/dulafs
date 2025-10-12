@@ -62,6 +62,7 @@ int add_record_to_dir(struct directory_item record, struct inode* inode);
 uint8_t* get_node_data(struct inode* inode);
 struct inode get_inode(int node_id);
 int format(int size);
+int path_to_inode(char* path);
 int test();
 
 #endif

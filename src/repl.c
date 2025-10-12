@@ -75,7 +75,7 @@ void repl(){
                     printf("invalid number of arguents for function %s, expected: %d, got %d\n", commands[i].name, commands[i].arg_count, token_count - 1);
                     continue;
                 }
-                // Call function
+                // execute the command
                 int ret_val =  commands[i].function(token_count,args);
                 if (!ret_val){
                     // printf("function returned with success\n");

@@ -64,6 +64,7 @@ struct inode get_inode(int node_id);
 int format(int size);
 char* inode_to_path(int inode_id);
 int path_to_inode(char* path);
+int delete_item(int inode_id, char* item_name);
 int test();
 
 #endif

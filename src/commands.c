@@ -30,7 +30,7 @@ int cmd_mkdir(int argc, char** argv) {
 
     // separate name of the dir from path
     char* last_slash = strrchr(argv[1], '/');
-    const char* dir_name;
+    char* dir_name;
     // strip the name from target path
     if (last_slash) {
         dir_name = last_slash + 1;
@@ -59,8 +59,29 @@ int cmd_mkdir(int argc, char** argv) {
     return EXIT_SUCCESS;
 }
 
-int cmd_rmdir(int argc, char** argv) { printf("TODO: Remove directory function called\n"); return 0; }
+int cmd_rmdir(int argc, char** argv) {
 
+    char target_path[MAX_DIR_PATH];
+    strcpy(target_path, argv[1]);
+    
+    // separate name of the dir from path and strip it from target path
+    char* last_slash = strrchr(argv[1], '/');
+    char* dir_name;
+
+    // strip the name from target path
+    if (last_slash) {
+        dir_name = last_slash + 1;
+        size_t index = last_slash - argv[1];
+        target_path[index] = '\0';
+    } else {
+        dir_name = argv[1];
+        target_path[0] = '\0';
+    }    
+    int target_node_id = path_to_inode(target_path);
+    delete_item(target_node_id, dir_name);
+
+}
+    
 int cmd_ls(int argc, char** argv) {
     struct inode curr_inode = get_inode(g_system_state.curr_node_id);
     struct directory_item* dir_content = (struct directory_item*) get_node_data(&curr_inode);
@@ -127,7 +148,7 @@ struct CommandEntry commands[] = {
     {"outcp", cmd_outcp, 0},
     {"load", cmd_load, 0},
     {"statfs", cmd_statfs, 0},
-    {"test", test, 0},
+    {"test", test, -1},
 };
 
 // Number of commands

@@ -230,6 +230,7 @@ int* get_node_clusters(struct inode* inode){
     for (int i = 0; i < cluster_count && i < DIRECT_CLUSTER_COUNT; i++){
         carr[i] = inode->direct[i];
     }
+    // TODO: handle indirect stuff
     return carr;
 }
 
@@ -250,6 +251,51 @@ uint8_t* get_node_data(struct inode* inode){
     free(cluster_arr);
     return data;
 };
+
+int delete_item(int inode_id, char* item_name){
+    struct inode inode = get_inode(inode_id);
+    if (inode.is_file){
+        fprintf(stderr, "not a directory");
+        return EXIT_FAILURE;
+    }
+    struct directory_item* dir_content = (struct directory_item*) get_node_data(&inode);
+    int record_count = inode.file_size / sizeof(struct directory_item);
+    int item_found = 0;
+    // loop through directory items to find the one to delete
+    for (int i = 0; i < record_count; i++){
+        if (!strcmp(dir_content[i].item_name, item_name)){
+            item_found = 1;
+            struct inode inode_to_delete = get_inode(dir_content[i].inode);
+            
+            // remove item from directory
+            struct directory_item empty_item = {0};
+            int offset = g_system_state.sb.data_start_address + inode.direct[0] * CLUSTER_SIZE + i * sizeof(struct directory_item);
+            fseek(g_system_state.file_ptr, offset, SEEK_SET);
+            fwrite(&empty_item, sizeof(struct directory_item), 1, g_system_state.file_ptr);
+
+            // set the inode as free in bitmap
+            clear_bit(inode_to_delete.id, g_system_state.sb.bitmapi_start_address);
+
+            // free the inode clusters
+            int* clusters = get_node_clusters(&inode_to_delete);
+            if (clusters != NULL){
+                int cluster_count = (inode_to_delete.file_size+CLUSTER_SIZE-1)/CLUSTER_SIZE;
+                for (int j = 0; j < cluster_count; j++){
+                    clear_bit(clusters[j], g_system_state.sb.bitmap_start_address);
+                }
+            }
+            free(clusters);
+
+            break;
+        }
+    }
+    free(dir_content);
+    if(!item_found){
+        fprintf(stderr, "Could not find %s\n", item_name);
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
+}
 
 int add_record_to_dir(struct directory_item record, struct inode* inode){ 
     struct directory_item* node_data = (struct directory_item*) get_node_data(inode);
@@ -339,6 +385,7 @@ int format(int size){
 }
 
 int test() {
+    delete_item(ROOT_NODE, "test");
     printf("=== Test Complete ===\n");
     return 0;
 }

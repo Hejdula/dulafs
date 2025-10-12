@@ -25,12 +25,35 @@ int cmd_mv(int argc, char** argv) { printf("TODO: Move function called\n"); retu
 int cmd_rm(int argc, char** argv) { printf("TODO: Remove function called\n"); return 0; }
 
 int cmd_mkdir(int argc, char** argv) {
-    int new_node_id = create_dir_node(g_system_state.curr_node_id); 
+    char target_path[MAX_DIR_PATH];
+    strcpy(target_path, argv[1]);
+
+    // separate name of the dir from path
+    char* last_slash = strrchr(argv[1], '/');
+    const char* dir_name;
+    // strip the name from target path
+    if (last_slash) {
+        dir_name = last_slash + 1;
+        size_t index = last_slash - argv[1];
+        target_path[index] = '\0';
+    } else {
+        dir_name = argv[1];
+        target_path[0] = '\0';
+    }
+
+    int target_node_id = path_to_inode(target_path);
+    struct inode target_inode = get_inode(target_node_id);
+    if (target_node_id == -1) return EXIT_FAILURE;
+    if (target_inode.is_file) {
+        printf("target destination is a file");
+        return EXIT_FAILURE;
+    }
+    int new_node_id = create_dir_node(target_node_id); 
     struct directory_item dir_record = {0};
     dir_record.inode = new_node_id;
-    strncpy(dir_record.item_name, argv[1], sizeof(dir_record.item_name) - 1);
+    strncpy(dir_record.item_name, dir_name, sizeof(dir_record.item_name) - 1);
     dir_record.item_name[sizeof(dir_record.item_name) - 1] = '\0';
-    struct inode curr_node = get_inode(g_system_state.curr_node_id); 
+    struct inode curr_node = get_inode(target_node_id); 
     add_record_to_dir(dir_record, &curr_node);
 
     return EXIT_SUCCESS;
@@ -75,6 +98,7 @@ int cmd_cd(int argc, char** argv) {
 
 int cmd_pwd(int argc, char** argv) {
     char* path = inode_to_path(g_system_state.curr_node_id);
+    if(path == NULL) return EXIT_FAILURE;
     printf("working directory: %s\n", path);
     free(path);
     return EXIT_SUCCESS;

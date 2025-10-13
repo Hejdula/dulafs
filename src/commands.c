@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include "commands.h"
 #include "dulafs.h"
@@ -101,7 +102,26 @@ int cmd_ls(int argc, char** argv) {
     return EXIT_SUCCESS;
 }
 
-int cmd_cat(int argc, char** argv) { printf("TODO: Cat function called\n"); return 0; }
+int cmd_cat(int argc, char** argv) { 
+    int node_id = path_to_inode(argv[1]);
+    if (node_id == -1) return EXIT_FAILURE;
+    struct inode inode = get_inode(node_id);
+    uint8_t* data = (uint8_t*)get_node_data(&inode);
+    printf("inode size: %d\n", inode.file_size);
+    for (int i = 0; i < inode.file_size; i++) {
+        if (data[i] >= 32 && data[i] <= 126) {
+            putchar(data[i]);
+        } else if (data[i] == 0){
+            putchar('0');
+        } else {
+            putchar('~');
+        }
+    }
+    putchar('\n');
+
+    free(data);
+    return EXIT_SUCCESS;
+}
 
 int cmd_cd(int argc, char** argv) {
     int new_node_id = path_to_inode(argv[1]);
@@ -145,7 +165,7 @@ struct CommandEntry commands[] = {
     {"mkdir", cmd_mkdir, 1},
     {"rmdir", cmd_rmdir, 1},
     {"ls", cmd_ls, -1},
-    {"cat", cmd_cat, 0},
+    {"cat", cmd_cat, 1},
     {"cd", cmd_cd, 1},
     {"pwd", cmd_pwd, 0},
     {"info", cmd_info, 0},

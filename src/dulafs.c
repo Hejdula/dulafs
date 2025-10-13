@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define I_NODE_RATIO 0.1 
+#define I_NODE_RATIO 0.01 
 #define CLUSTER_SIZE 1024
 
 
@@ -246,8 +246,8 @@ int* get_node_clusters(struct inode* inode){
     fread(indirect_arr, CLUSTER_SIZE, 1, g_system_state.file_ptr);
     
     // iterate through the clusters
-    for (i = i; i < cluster_count && i < (max_1st_indirect + DIRECT_CLUSTER_COUNT); i++){
-        carr[i] = indirect_arr[i - DIRECT_CLUSTER_COUNT];
+    for (int direct_index = 0; i < cluster_count && direct_index < max_1st_indirect; direct_index++, i++){
+        carr[i] = indirect_arr[direct_index];
     }
 
 
@@ -274,8 +274,8 @@ int* get_node_clusters(struct inode* inode){
         fread(indirect_arr, CLUSTER_SIZE, 1, g_system_state.file_ptr);
 
         // iterate through the clusters
-        for (int j = 0; j < max_1st_indirect && i < cluster_count; j++, i++){
-            carr[i] = indirect_arr[j];
+        for (int direct_index = 0; direct_index < max_1st_indirect && i < cluster_count; direct_index++, i++){
+            carr[i] = indirect_arr[direct_index];
         }
     }
 
@@ -435,6 +435,8 @@ int format(int size){
 }
 
 int test() {
+    
+    printf("record size %ld", sizeof(struct directory_item));
     printf("=== Test Complete ===\n");
     return 0;
 }

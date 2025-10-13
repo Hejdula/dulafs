@@ -47,6 +47,7 @@ int main(int argc, char* argv[]){
         printf("Disk size: %d bytes\n", g_system_state.sb.disk_size);
         printf("Cluster size: %d bytes\n", g_system_state.sb.cluster_size);
         printf("Cluster count: %d\n", g_system_state.sb.cluster_count);
+        printf("Inode count: %d\n", g_system_state.sb.inode_count);
         printf("Inode bitmap start address: %d\n", g_system_state.sb.bitmapi_start_address);
         printf("Cluster bitmap start address: %d\n", g_system_state.sb.bitmap_start_address);
         printf("Inode start address: %d\n", g_system_state.sb.inode_start_address);

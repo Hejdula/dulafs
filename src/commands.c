@@ -2,8 +2,11 @@
 #include <stdio.h>
 #include "commands.h"
 #include "dulafs.h"
-#include "stdlib.h"
+#include <stdlib.h>
 #include <string.h>
+#include <time.h>
+
+
 
 // Command function implementations
 int cmd_format(int argc, char** argv) {
@@ -84,8 +87,10 @@ int cmd_rmdir(int argc, char** argv) {
         target_path[0] = '\0';
     }    
     int target_node_id = path_to_inode(target_path);
-    delete_item(target_node_id, dir_name);
+    struct inode target_inode = get_inode(target_node_id);
+    delete_item(&target_inode, dir_name);
 
+    return EXIT_SUCCESS;
 }
     
 int cmd_ls(int argc, char** argv) {
@@ -112,7 +117,7 @@ int cmd_cat(int argc, char** argv) {
         if (data[i] >= 32 && data[i] <= 126) {
             putchar(data[i]);
         } else if (data[i] == 0){
-            putchar('0');
+            printf("\xE2\x96\xA1"); // Unicode white square (U+25A1) in UTF-8 to represent zero byte
         } else {
             putchar('~');
         }
@@ -151,7 +156,80 @@ int cmd_pwd(int argc, char** argv) {
 }
 
 int cmd_info(int argc, char** argv) { printf("TODO: Info function called\n"); return 0; }
-int cmd_incp(int argc, char** argv) { printf("TODO: Input copy function called\n"); return 0; }
+
+int cmd_incp(int argc, char** argv) {
+
+    FILE* fptr = fopen(argv[1],"r");
+
+    if (!fptr){
+        printf("File not found");
+        return EXIT_FAILURE;
+    }
+    
+    fseek(fptr, 0, SEEK_END);
+    int file_size = ftell(fptr);
+    
+    
+    // initialize the file inode
+    
+    int new_node_id = assign_empty_inode();
+    struct inode inode = get_inode(new_node_id);
+    inode.is_file = 1;
+    inode.file_size = file_size;
+    write_inode(&inode);
+
+    // separate name of the file from path
+    char target_path[MAX_DIR_PATH];
+    strcpy(target_path, argv[1]);
+    
+    char* last_slash = strrchr(argv[1], '/');
+    char* file_name;
+
+    if (last_slash) {
+        file_name = last_slash + 1;
+        size_t index = last_slash - argv[1];
+        target_path[index] = '\0';
+    } else {
+        file_name = argv[1];
+        target_path[0] = '\0';
+    }    
+
+    // get node_id of the directory
+    int target_dir_id = path_to_inode(target_path);
+    if(target_dir_id == -1){
+        delete_inode(&inode);
+        fclose(fptr);
+        return EXIT_FAILURE;
+    }
+
+    // add the file into directory
+    struct inode target_dir = get_inode(target_dir_id);
+    struct directory_item item = {inode.id,};
+    add_record_to_dir(item, &target_dir);
+
+    // assign clusters to this inode
+    int* clusters = assign_node_clusters(&inode);
+
+    // write the file data into clusters
+    uint8_t current_cluster_data[CLUSTER_SIZE];
+    int cluster_count = (inode.file_size + CLUSTER_SIZE - 1) / CLUSTER_SIZE;
+    
+    rewind(fptr);
+    for (int i = 0; i < cluster_count; i++){    
+        fread(current_cluster_data, CLUSTER_SIZE, 1, fptr); 
+        int offset = clusters[i] * CLUSTER_SIZE + g_system_state.sb.data_start_address;
+        fseek(g_system_state.file_ptr, offset, SEEK_SET);
+        fwrite(current_cluster_data, CLUSTER_SIZE, 1, g_system_state.file_ptr);
+    }
+    fflush(g_system_state.file_ptr);
+
+
+
+    fclose(fptr);
+    free(clusters);
+    return EXIT_SUCCESS;
+}
+
 int cmd_outcp(int argc, char** argv) { printf("TODO: Output copy function called\n"); return 0; }
 int cmd_load(int argc, char** argv) { printf("TODO: Load function called\n"); return 0; }
 int cmd_statfs(int argc, char** argv) { printf("TODO: Status filesystem function called\n"); return 0; }

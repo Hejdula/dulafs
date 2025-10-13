@@ -4,8 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define I_NODE_RATIO 0.01 
-#define CLUSTER_SIZE 1024
 
 
 const int ID_ITEM_FREE = 0;
@@ -88,6 +86,7 @@ struct superblock get_superblock(int disk_size){
         .disk_size = disk_size,
         .cluster_size = CLUSTER_SIZE,
         .cluster_count = cluster_count,
+        .inode_count = inode_count,
         .bitmapi_start_address = bitmapi_start_address,
         .bitmap_start_address = bitmap_start_address,
         .inode_start_address = inode_start_address,
@@ -121,12 +120,14 @@ int get_empty_index(int bitmap_offset){
 
 int assign_empty_inode(){
     int node_id = get_empty_index(g_system_state.sb.bitmapi_start_address);
+    if (node_id >= g_system_state.sb.inode_count) return -1;
     set_bit(node_id, g_system_state.sb.bitmapi_start_address);
     return node_id;
 }
 
 int assign_empty_cluster(){
     int cluster_id = get_empty_index(g_system_state.sb.bitmap_start_address);
+    if (cluster_id >= g_system_state.sb.cluster_count) return -1;
     set_bit(cluster_id, g_system_state.sb.bitmap_start_address);
     return cluster_id;
 }
@@ -136,6 +137,28 @@ struct inode get_inode(int node_id){
     fseek(g_system_state.file_ptr, g_system_state.sb.inode_start_address + node_id * sizeof(struct inode), SEEK_SET);
     fread(&inode, sizeof(struct inode), 1, g_system_state.file_ptr);
     return inode;
+}
+
+int contains_file(struct inode* inode, char* file_name){
+    if (inode->is_file) {
+        return 0;
+    }
+    
+    struct directory_item* dir_content = (struct directory_item*) get_node_data(inode);
+    if (!dir_content) return 0;
+    
+    int record_count = inode->file_size / sizeof(struct directory_item);
+    int found = 0;
+    
+    for (int i = 0; i < record_count; i++){
+        if (!strcmp(dir_content[i].item_name, file_name)){
+            found = 1;
+            break;
+        }
+    }
+    
+    free(dir_content);
+    return found;
 }
 
 char* inode_to_path(int inode_id){
@@ -221,6 +244,104 @@ int path_to_inode(char* path){
     return curr_node_id;
 }
 
+int* assign_node_clusters(struct inode* inode){
+    int cluster_count = (inode->file_size + CLUSTER_SIZE - 1) / CLUSTER_SIZE;
+    if(!cluster_count){
+        return NULL;
+    }
+    
+    int* carr = malloc(cluster_count * sizeof(int));
+    if (!carr) return NULL;
+    
+    int i;
+    // Assign direct clusters
+    for (i = 0; i < cluster_count && i < DIRECT_CLUSTER_COUNT; i++){
+        carr[i] = assign_empty_cluster();
+        inode->direct[i] = carr[i];
+    }
+    
+    if (i >= cluster_count) {
+        write_inode(inode);
+        return carr;
+    }
+    
+    int max_1st_indirect = CLUSTER_SIZE / sizeof(int);
+    
+    // Need 1st level indirect
+    int* indirect_arr = calloc(max_1st_indirect, sizeof(int));
+    if (!indirect_arr) { free(carr); return NULL; }
+    
+    // Assign indirect1 cluster if not already assigned
+    if (!inode->indirect1) {
+        inode->indirect1 = assign_empty_cluster();
+    }
+    
+    // Assign clusters through 1st level indirect
+    for (int direct_index = 0; i < cluster_count && direct_index < max_1st_indirect; direct_index++, i++){
+        carr[i] = assign_empty_cluster();
+        indirect_arr[direct_index] = carr[i];
+    }
+    
+    // Write 1st level indirect to disk
+    int offset = g_system_state.sb.data_start_address + inode->indirect1 * CLUSTER_SIZE;
+    fseek(g_system_state.file_ptr, offset, SEEK_SET);
+    fwrite(indirect_arr, CLUSTER_SIZE, 1, g_system_state.file_ptr);
+    fflush(g_system_state.file_ptr);
+    
+    if (i >= cluster_count) {
+        free(indirect_arr);
+        write_inode(inode);
+        return carr;
+    }
+    
+    int max_2nd_indirect = max_1st_indirect * max_1st_indirect;
+    
+    // Need 2nd level indirect
+    int* indirect_clusters = calloc(max_1st_indirect, sizeof(int));
+    if (!indirect_clusters) { free(carr); free(indirect_arr); return NULL; }
+    
+    // Assign indirect2 cluster if not already assigned
+    if (!inode->indirect2) {
+        inode->indirect2 = assign_empty_cluster();
+    }
+    
+    int max_total = DIRECT_CLUSTER_COUNT + max_1st_indirect + max_2nd_indirect;
+    
+    // Iterate through pages of 1st level indirect
+    for (int indirect_index = 0; i < cluster_count && i < max_total; indirect_index++){
+        // Assign a cluster for this indirect page if needed
+        if (!indirect_clusters[indirect_index]) {
+            indirect_clusters[indirect_index] = assign_empty_cluster();
+        }
+        
+        // Clear the indirect array for this page
+        memset(indirect_arr, 0, CLUSTER_SIZE);
+        
+        // Assign clusters through this indirect page
+        for (int direct_index = 0; direct_index < max_1st_indirect && i < cluster_count; direct_index++, i++){
+            carr[i] = assign_empty_cluster();
+            indirect_arr[direct_index] = carr[i];
+        }
+        
+        // Write this indirect page to disk
+        offset = g_system_state.sb.data_start_address + indirect_clusters[indirect_index] * CLUSTER_SIZE;
+        fseek(g_system_state.file_ptr, offset, SEEK_SET);
+        fwrite(indirect_arr, CLUSTER_SIZE, 1, g_system_state.file_ptr);
+        fflush(g_system_state.file_ptr);
+    }
+    
+    // Write 2nd level indirect clusters array to disk
+    offset = g_system_state.sb.data_start_address + inode->indirect2 * CLUSTER_SIZE;
+    fseek(g_system_state.file_ptr, offset, SEEK_SET);
+    fwrite(indirect_clusters, CLUSTER_SIZE, 1, g_system_state.file_ptr);
+    fflush(g_system_state.file_ptr);
+    
+    free(indirect_arr);
+    free(indirect_clusters);
+    write_inode(inode);
+    return carr;
+}
+
 int* get_node_clusters(struct inode* inode){
     int cluster_count = (inode->file_size + CLUSTER_SIZE - 1) / CLUSTER_SIZE;
     if(!cluster_count){
@@ -302,42 +423,55 @@ uint8_t* get_node_data(struct inode* inode){
     return data;
 };
 
-int delete_item(int inode_id, char* item_name){
-    struct inode inode = get_inode(inode_id);
-    if (inode.is_file){
-        fprintf(stderr, "not a directory");
+void delete_inode(struct inode* inode){ 
+    // set the inode as free in bitmap
+    clear_bit(inode->id, g_system_state.sb.bitmapi_start_address);
+
+    // free the inode clusters
+    int* clusters = get_node_clusters(inode);
+    if (clusters != NULL){
+        int cluster_count = (inode->file_size+CLUSTER_SIZE-1)/CLUSTER_SIZE;
+        for (int j = 0; j < cluster_count; j++){
+            clear_bit(clusters[j], g_system_state.sb.bitmap_start_address);
+        }
+    }
+    free(clusters);
+}
+
+int delete_item(struct inode* inode, char* item_name){
+    if (inode->is_file){
+        fprintf(stderr, "not a directory\n");
         return EXIT_FAILURE;
     }
-    struct directory_item* dir_content = (struct directory_item*) get_node_data(&inode);
-    int record_count = inode.file_size / sizeof(struct directory_item);
+    struct directory_item* dir_content = (struct directory_item*) get_node_data(inode);
+    int record_count = inode->file_size / sizeof(struct directory_item);
     int item_found = 0;
     // loop through directory items to find the one to delete
     for (int i = 0; i < record_count; i++){
         if (!strcmp(dir_content[i].item_name, item_name)){
             item_found = 1;
             struct inode inode_to_delete = get_inode(dir_content[i].inode);
+
+            if (inode_to_delete.file_size != 32 && !inode_to_delete.is_file) {
+                printf("Target directory is not empty\n");
+                free(dir_content);
+                return EXIT_FAILURE;
+            }
             
             // remove item from directory
             struct directory_item empty_item = {0};
-            int offset = g_system_state.sb.data_start_address + inode.direct[0] * CLUSTER_SIZE + i * sizeof(struct directory_item);
+            int offset = g_system_state.sb.data_start_address + inode->direct[0] * CLUSTER_SIZE + i * sizeof(struct directory_item);
             fseek(g_system_state.file_ptr, offset, SEEK_SET);
             fwrite(&empty_item, sizeof(struct directory_item), 1, g_system_state.file_ptr);
 
-            // set the inode as free in bitmap
-            clear_bit(inode_to_delete.id, g_system_state.sb.bitmapi_start_address);
+            delete_inode(&inode_to_delete); 
 
-            // free the inode clusters
-            int* clusters = get_node_clusters(&inode_to_delete);
-            if (clusters != NULL){
-                int cluster_count = (inode_to_delete.file_size+CLUSTER_SIZE-1)/CLUSTER_SIZE;
-                for (int j = 0; j < cluster_count; j++){
-                    clear_bit(clusters[j], g_system_state.sb.bitmap_start_address);
-                }
-            }
-            free(clusters);
-
+            inode->file_size -= sizeof(struct directory_item);
+            write_inode(inode);
+            
             break;
         }
+
     }
     free(dir_content);
     if(!item_found){
@@ -358,6 +492,7 @@ int add_record_to_dir(struct directory_item record, struct inode* inode){
     int final_offset;
     int empty_space_found = 0;
 
+    // look for empty spaces between records to fill
     struct directory_item current;
     for (int i = 0; i < record_count; i++){
         current = node_data[i];
@@ -370,6 +505,7 @@ int add_record_to_dir(struct directory_item record, struct inode* inode){
         }
     }
 
+    // if all of them are full, append this one to end of the directory
     if(!empty_space_found){
         final_offset = g_system_state.sb.data_start_address + inode->direct[0] * CLUSTER_SIZE + inode->file_size;
     }
@@ -426,6 +562,7 @@ int format(int size){
     printf("Disk size: %d bytes\n", sb.disk_size);
     printf("Cluster size: %d bytes\n", sb.cluster_size);
     printf("Cluster count: %d\n", sb.cluster_count);
+    printf("Inode count: %d\n", sb.inode_count);
     printf("Inode bitmap start address: %d\n", sb.bitmapi_start_address);
     printf("Cluster bitmap start address: %d\n", sb.bitmap_start_address);
     printf("Inode start address: %d\n", sb.inode_start_address);

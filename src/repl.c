@@ -60,7 +60,7 @@ void repl(){
         char * command = args[0];
         for (int i = 1; i < token_count; i++) {
             args[i] = strtok(NULL, " ");
-            printf("arg[%d]: %s\n",i,args[i]);
+            // printf("arg[%d]: %s\n",i,args[i]);
         } 
 
         // Check if command matches any known command and call its function

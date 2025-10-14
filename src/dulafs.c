@@ -573,7 +573,6 @@ int format(int size){
 
 int test() {
     
-    printf("record size %ld", sizeof(struct directory_item));
     printf("=== Test Complete ===\n");
     return 0;
 }

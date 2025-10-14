@@ -112,14 +112,12 @@ int cmd_cat(int argc, char** argv) {
     if (node_id == -1) return EXIT_FAILURE;
     struct inode inode = get_inode(node_id);
     uint8_t* data = (uint8_t*)get_node_data(&inode);
-    printf("inode size: %d\n", inode.file_size);
+    // printf("inode size: %d\n", inode.file_size);
     for (int i = 0; i < inode.file_size; i++) {
-        if (data[i] >= 32 && data[i] <= 126) {
-            putchar(data[i]);
-        } else if (data[i] == 0){
+        if (data[i] == 0){
             printf("\xE2\x96\xA1"); // Unicode white square (U+25A1) in UTF-8 to represent zero byte
         } else {
-            putchar('~');
+            putchar(data[i]);
         }
     }
     putchar('\n');
@@ -173,29 +171,31 @@ int cmd_incp(int argc, char** argv) {
     // initialize the file inode
     
     int new_node_id = assign_empty_inode();
-    struct inode inode = get_inode(new_node_id);
+    struct inode inode = {0};
+    inode.id = new_node_id;
     inode.is_file = 1;
     inode.file_size = file_size;
     write_inode(&inode);
 
     // separate name of the file from path
     char target_path[MAX_DIR_PATH];
-    strcpy(target_path, argv[1]);
+    strcpy(target_path, argv[2]);
     
-    char* last_slash = strrchr(argv[1], '/');
+    char* last_slash = strrchr(argv[2], '/');
     char* file_name;
 
     if (last_slash) {
         file_name = last_slash + 1;
-        size_t index = last_slash - argv[1];
+        size_t index = last_slash - argv[2];
         target_path[index] = '\0';
     } else {
-        file_name = argv[1];
+        file_name = argv[2];
         target_path[0] = '\0';
     }    
 
     // get node_id of the directory
     int target_dir_id = path_to_inode(target_path);
+    printf("target_path: %s", target_path);
     if(target_dir_id == -1){
         delete_inode(&inode);
         fclose(fptr);
@@ -204,7 +204,9 @@ int cmd_incp(int argc, char** argv) {
 
     // add the file into directory
     struct inode target_dir = get_inode(target_dir_id);
-    struct directory_item item = {inode.id,};
+    struct directory_item item = {0};
+    item.inode = inode.id;
+    strlcpy(item.item_name, file_name, sizeof(item.item_name));
     add_record_to_dir(item, &target_dir);
 
     // assign clusters to this inode
@@ -215,11 +217,21 @@ int cmd_incp(int argc, char** argv) {
     int cluster_count = (inode.file_size + CLUSTER_SIZE - 1) / CLUSTER_SIZE;
     
     rewind(fptr);
-    for (int i = 0; i < cluster_count; i++){    
-        fread(current_cluster_data, CLUSTER_SIZE, 1, fptr); 
+    for (int i = 0; i < cluster_count; i++){
+        // Zero out the buffer to avoid writing uninitialized data
+        memset(current_cluster_data, 0, CLUSTER_SIZE);
+        
+        // Calculate bytes to read for this cluster
+        int bytes_to_read = CLUSTER_SIZE;
+        if (i == cluster_count - 1 && file_size % CLUSTER_SIZE != 0) {
+            bytes_to_read = file_size % CLUSTER_SIZE;
+        }
+        
+        fread(current_cluster_data, 1, bytes_to_read, fptr); 
+        
         int offset = clusters[i] * CLUSTER_SIZE + g_system_state.sb.data_start_address;
         fseek(g_system_state.file_ptr, offset, SEEK_SET);
-        fwrite(current_cluster_data, CLUSTER_SIZE, 1, g_system_state.file_ptr);
+        fwrite(current_cluster_data, 1, CLUSTER_SIZE, g_system_state.file_ptr);
     }
     fflush(g_system_state.file_ptr);
 
@@ -247,7 +259,7 @@ struct CommandEntry commands[] = {
     {"cd", cmd_cd, 1},
     {"pwd", cmd_pwd, 0},
     {"info", cmd_info, 0},
-    {"incp", cmd_incp, 0},
+    {"incp", cmd_incp, 2},
     {"outcp", cmd_outcp, 0},
     {"load", cmd_load, 0},
     {"statfs", cmd_statfs, 0},

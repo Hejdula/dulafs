@@ -29,17 +29,15 @@ int cmd_mv(int argc, char** argv) { printf("TODO: Move function called\n"); retu
 int cmd_rm(int argc, char** argv) { printf("TODO: Remove function called\n"); return 0; }
 
 int cmd_mkdir(int argc, char** argv) {
-    char target_path[MAX_DIR_PATH];
-    strcpy(target_path, argv[1]);
-
+    
     // separate name of the dir from path
-    char* last_slash = strrchr(argv[1], '/');
+    char target_path[MAX_DIR_PATH];
     char* dir_name;
-    // strip the name from target path
-    if (last_slash) {
-        dir_name = last_slash + 1;
-        size_t index = last_slash - argv[1];
-        target_path[index] = '\0';
+    strcpy(target_path, argv[1]);
+    char* last_slash_ptr = strrchr(target_path, '/');
+    if (last_slash_ptr) {
+        dir_name = last_slash_ptr + 1;
+        target_path[last_slash_ptr - target_path] = '\0';
     } else {
         dir_name = argv[1];
         target_path[0] = '\0';
@@ -153,7 +151,10 @@ int cmd_pwd(int argc, char** argv) {
     return EXIT_SUCCESS;
 }
 
-int cmd_info(int argc, char** argv) { printf("TODO: Info function called\n"); return 0; }
+int cmd_info(int argc, char** argv) {
+    
+    return EXIT_SUCCESS;
+}
 
 int cmd_incp(int argc, char** argv) {
 

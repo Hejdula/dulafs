@@ -242,7 +242,21 @@ int cmd_incp(int argc, char** argv) {
     return EXIT_SUCCESS;
 }
 
-int cmd_outcp(int argc, char** argv) { printf("TODO: Output copy function called\n"); return 0; }
+int cmd_outcp(int argc, char** argv) {
+    FILE* fptr = fopen(argv[2], "w+");
+    if(!fptr) return EXIT_FAILURE;
+
+    int file_node_id= path_to_inode(argv[1]);
+    struct inode file_inode = get_inode(file_node_id);
+
+    uint8_t* data = get_node_data(&file_inode);
+
+    if(!fwrite(data, file_inode.file_size, 1,fptr)) return EXIT_FAILURE;
+
+    fclose(fptr);
+
+    return EXIT_SUCCESS;
+}
 int cmd_load(int argc, char** argv) { printf("TODO: Load function called\n"); return 0; }
 int cmd_statfs(int argc, char** argv) { printf("TODO: Status filesystem function called\n"); return 0; }
 
@@ -258,9 +272,9 @@ struct CommandEntry commands[] = {
     {"cat", cmd_cat, 1},
     {"cd", cmd_cd, 1},
     {"pwd", cmd_pwd, 0},
-    {"info", cmd_info, 0},
+    {"info", cmd_info, 1},
     {"incp", cmd_incp, 2},
-    {"outcp", cmd_outcp, 0},
+    {"outcp", cmd_outcp, 2},
     {"load", cmd_load, 0},
     {"statfs", cmd_statfs, 0},
     {"test", test, -1},

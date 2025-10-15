@@ -68,7 +68,7 @@ int contains_file(struct inode* inode, char* file_name);
 struct directory_item* get_directory_items(struct inode* dir_node);
 
 
-void delete_inode(struct inode *inode);
+void clear_inode(struct inode *inode);
 int create_dir_node(int up_ref);
 void write_inode(struct inode *inode);
 int add_record_to_dir(struct directory_item record, struct inode* inode);
@@ -78,6 +78,8 @@ int* assign_node_clusters(struct inode* inode);
 int format(int size);
 char* inode_to_path(int inode_id);
 int path_to_inode(char* path);
+char* get_final_token(char* path);
+int path_to_dir_inode(char* path);
 int delete_item(struct inode* inode, char* item_name);
 int test();
 

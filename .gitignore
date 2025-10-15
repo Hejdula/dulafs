@@ -5,6 +5,9 @@
 test_file
 hello
 
+### valgrind ###
+vgcore*
+
 ### Vscode ###
 .vscode
 .clangd

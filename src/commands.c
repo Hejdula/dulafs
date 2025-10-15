@@ -30,20 +30,10 @@ int cmd_cp(int argc, char** argv) {
     if(original_inode_id == -1) return EXIT_FAILURE;
     struct inode original_node = get_inode(original_inode_id);
 
-    // separate name of the dir from path
-    char target_path[MAX_DIR_PATH];
-    char* file_name;
-    strcpy(target_path, argv[2]);
-    char* last_slash_ptr = strrchr(target_path, '/');
-    if (last_slash_ptr) {
-        file_name = last_slash_ptr + 1;
-        target_path[last_slash_ptr - target_path] = '\0';
-    } else {
-        file_name = argv[2];
-        target_path[0] = '\0';
-    }
+    // separate name of the file from path using helper function
+    char* file_name = get_final_token(argv[2]);
  
-    int target_dir_id = path_to_inode(target_path);
+    int target_dir_id = path_to_dir_inode(argv[2]);
     if (target_dir_id == -1) return EXIT_FAILURE;
     struct inode target_dir = get_inode(target_dir_id);
 
@@ -58,7 +48,7 @@ int cmd_cp(int argc, char** argv) {
     int* new_clusters = assign_node_clusters(&new_inode);
     int* original_clusters = get_node_clusters(&original_node);
     if (original_clusters == NULL) {
-        delete_inode(&new_inode);
+        clear_inode(&new_inode);
         return EXIT_FAILURE;
     }
 
@@ -102,58 +92,59 @@ int cmd_cp(int argc, char** argv) {
 
     return EXIT_SUCCESS;
 }
-int cmd_mv(int argc, char** argv) {
-    int inode_to_move_id = path_to_inode(argv[1]);
-    return EXIT_SUCCESS;
-}
-int cmd_rm(int argc, char** argv) {
-    // separate name of the dir from path
-    char target_path[MAX_DIR_PATH];
-    char* file_name;
-    strcpy(target_path, argv[1]);
-    char* last_slash_ptr = strrchr(target_path, '/');
-    if (last_slash_ptr) {
-        file_name = last_slash_ptr + 1;
-        target_path[last_slash_ptr - target_path] = '\0';
-    } else {
-        file_name = argv[1];
-        target_path[0] = '\0';
+int cmd_mv(int argc, char** argv) { 
+    char* to_file_name = get_final_token(argv[2]);
+    char* from_file_name = get_final_token(argv[1]);
+    
+    // source directory
+    int from_dir_id = path_to_dir_inode(argv[1]); 
+    if (from_dir_id == -1){ return EXIT_FAILURE; }
+    struct inode from_dir_inode = get_inode(from_dir_id);
+    
+    // destination directory
+    int to_dir_id = path_to_dir_inode(argv[2]);
+    if (to_dir_id == -1){ return EXIT_FAILURE; }
+    struct inode to_dir_inode = get_inode(to_dir_id); 
+    
+    // source file
+    int from_inode_id = path_to_inode(argv[1]);
+    if (from_inode_id == -1){ return EXIT_FAILURE;}
+    struct inode from_inode = get_inode(from_inode_id);
+
+    if (!from_inode.is_file){
+        printf("%s is not a file\n", argv[1]);
+        return EXIT_FAILURE;
     }
-
-    int dir_id = path_to_inode(target_path);
-    if (dir_id == -1) return  EXIT_FAILURE;
-    struct inode dir_inode = get_inode(dir_id); 
-
-    int inode_id = path_to_inode(argv[1]);
-    if (inode_id == -1) return EXIT_FAILURE;
-    struct inode inode = get_inode(inode_id);
-    if (!inode.is_file){
-        printf("Not a file");
+    if (contains_file(&to_dir_inode, to_file_name)){
+        printf("File %s already exists\n", argv[2]);
         return EXIT_FAILURE;
     }
 
-    delete_item(&dir_inode, file_name); 
-    delete_inode(&inode);
+    struct directory_item new_record = {0};
+    new_record.inode = from_inode_id;
+    strlcpy(new_record.item_name, to_file_name, sizeof(char[DIR_NAME_SIZE]));
+    if (add_record_to_dir(new_record, &to_dir_inode)) { 
+        printf("could not add file to directory\n");
+        return EXIT_FAILURE;
+    }
+    delete_item(&from_dir_inode, from_file_name);
+
+    return EXIT_SUCCESS;
+}
+
+int cmd_rm(int argc, char** argv) {
+
+
     fflush(g_system_state.file_ptr); 
     return EXIT_SUCCESS;
 }
 
 int cmd_mkdir(int argc, char** argv) {
     
-    // separate name of the dir from path
-    char target_path[MAX_DIR_PATH];
-    char* dir_name;
-    strcpy(target_path, argv[1]);
-    char* last_slash_ptr = strrchr(target_path, '/');
-    if (last_slash_ptr) {
-        dir_name = last_slash_ptr + 1;
-        target_path[last_slash_ptr - target_path] = '\0';
-    } else {
-        dir_name = argv[1];
-        target_path[0] = '\0';
-    }
+    // separate name of the dir from path using helper function
+    char* dir_name = get_final_token(argv[1]);
 
-    int target_node_id = path_to_inode(target_path);
+    int target_node_id = path_to_dir_inode(argv[1]);
     struct inode target_inode = get_inode(target_node_id);
     if (target_node_id == -1) return EXIT_FAILURE;
     if (target_inode.is_file) {
@@ -178,23 +169,10 @@ int cmd_rmdir(int argc, char** argv) {
         return EXIT_FAILURE;
     }
 
-    char target_path[MAX_DIR_PATH];
-    strcpy(target_path, argv[1]);
+    // separate name of the dir from path using helper function
+    char* dir_name = get_final_token(argv[1]);
     
-    // separate name of the dir from path and strip it from target path
-    char* last_slash = strrchr(argv[1], '/');
-    char* dir_name;
-
-    // strip the name from target path
-    if (last_slash) {
-        dir_name = last_slash + 1;
-        size_t index = last_slash - argv[1];
-        target_path[index] = '\0';
-    } else {
-        dir_name = argv[1];
-        target_path[0] = '\0';
-    }    
-    int target_node_id = path_to_inode(target_path);
+    int target_node_id = path_to_dir_inode(argv[1]);
     struct inode target_inode = get_inode(target_node_id);
     delete_item(&target_inode, dir_name);
 
@@ -295,27 +273,13 @@ int cmd_incp(int argc, char** argv) {
     inode.file_size = file_size;
     write_inode(&inode);
 
-    // separate name of the file from path
-    char target_path[MAX_DIR_PATH];
-    strcpy(target_path, argv[2]);
-    
-    char* last_slash = strrchr(argv[2], '/');
-    char* file_name;
-
-    if (last_slash) {
-        file_name = last_slash + 1;
-        size_t index = last_slash - argv[2];
-        target_path[index] = '\0';
-    } else {
-        file_name = argv[2];
-        target_path[0] = '\0';
-    }    
+    // separate name of the file from path using helper function
+    char* file_name = get_final_token(argv[2]);
 
     // get node_id of the directory
-    int target_dir_id = path_to_inode(target_path);
-    printf("target_path: %s", target_path);
+    int target_dir_id = path_to_dir_inode(argv[2]);
     if(target_dir_id == -1){
-        delete_inode(&inode);
+        clear_inode(&inode);
         fclose(fptr);
         return EXIT_FAILURE;
     }

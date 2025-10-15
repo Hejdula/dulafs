@@ -114,7 +114,7 @@ int get_empty_index(int bitmap_offset){
     uint8_t byte;
     while ((byte = fgetc(g_system_state.file_ptr)) == 255) byte_index++;
     while (byte >> bit_offset & 1) bit_offset++; 
-    printf("final offset in get_empty_index: %d\n", byte_index * 8 + bit_offset);
+    // printf("final offset in get_empty_index: %d\n", byte_index * 8 + bit_offset);
     return byte_index * 8 + bit_offset;
 }
 
@@ -200,6 +200,34 @@ char* inode_to_path(int inode_id){
     }
     return path;
 }
+
+// Extract and return pointer to the final token/name from a path
+// "/foo/bar/file.txt" -> "file.txt", "file.txt" -> "file.txt"
+char* get_final_token(char* path) {
+    if (!path) return NULL;
+    
+    char* last_slash = strrchr(path, '/');
+    return last_slash ? last_slash + 1 : path;
+}
+
+int path_to_dir_inode(char* path){
+    size_t length = strlen(path);
+    char* path_copy = malloc(length);
+    strlcpy(path_copy, path, length);
+    char* last_slash = strrchr(path_copy,'/');
+    if(last_slash){
+        *last_slash = '\0';
+    } else {
+        free(path_copy);
+        return g_system_state.curr_node_id;
+    }
+    int retval = path_to_inode(path_copy);
+    free(path_copy);
+    return retval;
+}
+
+
+
 
 int path_to_inode(char* path){
     if (strlen(path) >= MAX_DIR_PATH){
@@ -425,10 +453,6 @@ uint8_t* get_node_data(struct inode* inode){
 
 // Returns a malloc'd array of directory items
 struct directory_item* get_directory_items(struct inode* dir_inode) {
-    if (dir_inode->file_size == 0) {
-        fprintf(stderr, "Error: Directory inode has file_size == 0.\n");
-        return NULL;
-    }
 
     struct directory_item* cluster_data = malloc(CLUSTER_SIZE);
     if (!cluster_data) { return NULL; }
@@ -442,7 +466,7 @@ struct directory_item* get_directory_items(struct inode* dir_inode) {
 
     int max_record_count = CLUSTER_SIZE / sizeof(struct directory_item);
     int record_count = 0;
-    for (int i = 0; i < max_record_count; i++) {
+    for (int i = 0; i < max_record_count && record_count < valid_record_count; i++) {
         if (cluster_data[i].item_name[0]) {
             dir_records[record_count] = cluster_data[i];
             record_count++;
@@ -450,7 +474,8 @@ struct directory_item* get_directory_items(struct inode* dir_inode) {
     }
 
     if(record_count != valid_record_count){
-        printf("Eror in directory inode size compared to valid records, this should not happen\n");
+        printf("Error in directory inode size compared to valid records, this should not happen\n");
+        printf("Expected %d records, found %d\n", valid_record_count, record_count);
     }
 
     free(cluster_data);
@@ -458,7 +483,7 @@ struct directory_item* get_directory_items(struct inode* dir_inode) {
 }
 
 
-void delete_inode(struct inode* inode){ 
+void clear_inode(struct inode* inode){ 
     // set the inode as free in bitmap
     clear_bit(inode->id, g_system_state.sb.bitmapi_start_address);
 
@@ -499,8 +524,8 @@ int delete_item(struct inode* inode, char* item_name){
             fseek(g_system_state.file_ptr, offset, SEEK_SET);
             fwrite(&empty_item, sizeof(struct directory_item), 1, g_system_state.file_ptr);
 
-            delete_inode(&inode_to_delete); 
-
+            clear_inode(&inode_to_delete); 
+        
             inode->file_size -= sizeof(struct directory_item);
             write_inode(inode);
             
@@ -518,10 +543,7 @@ int delete_item(struct inode* inode, char* item_name){
 
 int add_record_to_dir(struct directory_item record, struct inode* inode){ 
     struct directory_item* node_data = get_directory_items(inode);
-
-    if(inode->file_size == 0){
-        inode->direct[0] = assign_empty_cluster();
-    }
+    if(node_data == NULL) return EXIT_FAILURE;
 
     int record_count = inode->file_size / sizeof(struct directory_item);
     int final_offset;
@@ -545,12 +567,11 @@ int add_record_to_dir(struct directory_item record, struct inode* inode){
         final_offset = g_system_state.sb.data_start_address + inode->direct[0] * CLUSTER_SIZE + inode->file_size;
     }
 
-    printf("final offset in addrecord to dir: %d\n", final_offset);
+    // printf("final offset in addrecord to dir: %d\n", final_offset);
     fseek(g_system_state.file_ptr, final_offset, SEEK_SET);
     fwrite(&record, sizeof(struct directory_item), 1, g_system_state.file_ptr);
 
     inode->file_size += sizeof(struct directory_item);
-    printf("inode size: %d\n", inode->file_size);
     write_inode(inode);
 
     free(node_data);
@@ -563,6 +584,7 @@ int create_dir_node(int up_ref_id){
     inode.is_file = false;
     inode.id = assign_empty_inode();
 
+    inode.direct[0] = assign_empty_cluster();
     struct directory_item up_ref = {up_ref_id,"..\0\0\0\0\0\0\0\0\0\0"};
     struct directory_item self_ref = {inode.id,".\0\0\0\0\0\0\0\0\0\0\0"}; 
 
@@ -570,6 +592,7 @@ int create_dir_node(int up_ref_id){
     add_record_to_dir(self_ref, &inode);
 
     write_inode(&inode);
+    printf("root node size = %d", inode.file_size);
 
     return inode.id;
 }

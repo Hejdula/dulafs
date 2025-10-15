@@ -11,16 +11,15 @@
 // Command function implementations
 int cmd_format(int argc, char** argv) {
 
-    printf("Format function called\n"); 
     if(argc != 2){
-        return 1;
+        return EXIT_FAILURE;
     }
 
     char* endptr;
     long size = strtol(argv[1], &endptr, 10);
     if (*endptr != '\0' || size <= 0) {
         fprintf(stderr, "Invalid size argument: %s\n", argv[1]);
-        return 1;
+        return EXIT_FAILURE;
     }
     return format((int)size);
 }
@@ -144,23 +143,25 @@ int cmd_rm(int argc, char** argv) {
 
 int cmd_mkdir(int argc, char** argv) {
     
-    // separate name of the dir from path using helper function
+    // get parent directory and name of new one from args
     char* dir_name = get_final_token(argv[1]);
-
-    int target_node_id = path_to_dir_inode(argv[1]);
-    struct inode target_inode = get_inode(target_node_id);
-    if (target_node_id == -1) return EXIT_FAILURE;
-    if (target_inode.is_file) {
-        printf("target destination is a file");
+    int paretn_dir_id = path_to_dir_inode(argv[1]);
+    struct inode parent_inode = get_inode(paretn_dir_id);
+    if (paretn_dir_id == -1) return EXIT_FAILURE;
+    if (parent_inode.is_file) {
+        printf("Path does not exist");
         return EXIT_FAILURE;
     }
-    int new_node_id = create_dir_node(target_node_id); 
+
+    // create new directory node
+    int new_node_id = create_dir_node(paretn_dir_id); 
+
+    // create new record to add
     struct directory_item dir_record = {0};
     dir_record.inode = new_node_id;
-    strncpy(dir_record.item_name, dir_name, sizeof(dir_record.item_name) - 1);
-    dir_record.item_name[sizeof(dir_record.item_name) - 1] = '\0';
-    struct inode curr_node = get_inode(target_node_id); 
-    add_record_to_dir(dir_record, &curr_node);
+    strlcpy(dir_record.item_name, dir_name, sizeof(dir_record.item_name));
+
+    add_record_to_dir(dir_record, &parent_inode);
 
     return EXIT_SUCCESS;
 }
@@ -178,7 +179,6 @@ int cmd_rmdir(int argc, char** argv) {
     int target_node_id = path_to_dir_inode(argv[1]);
     struct inode target_inode = get_inode(target_node_id);
     delete_item(&target_inode, dir_name);
-    clear_inode(&target_inode);
 
     return EXIT_SUCCESS;
 }

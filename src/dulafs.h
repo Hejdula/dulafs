@@ -70,6 +70,7 @@ struct directory_item* get_directory_items(struct inode* dir_node);
 
 void clear_inode(struct inode *inode);
 int create_dir_node(int up_ref);
+void init_directory(struct inode* dir_inode, int parent_inode_id);
 void write_inode(struct inode *inode);
 int add_record_to_dir(struct directory_item record, struct inode* inode);
 int assign_empty_inode();

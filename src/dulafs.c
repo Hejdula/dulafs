@@ -18,7 +18,6 @@ struct SystemState g_system_state = {
 
 
 void set_bit(int i, int bitmap_offset){
-    printf("setting bit:%d\n", i);
     int byte_index = i/8;
     int bit_offset = i%8;
     int byte_position = byte_index + bitmap_offset;
@@ -225,9 +224,6 @@ int path_to_dir_inode(char* path){
     free(path_copy);
     return retval;
 }
-
-
-
 
 int path_to_inode(char* path){
     if (strlen(path) >= MAX_DIR_PATH){
@@ -518,14 +514,31 @@ int delete_item(struct inode* inode, char* item_name){
                 return EXIT_FAILURE;
             }
             
-            // remove item from directory
-            struct directory_item empty_item = {0};
-            int offset = g_system_state.sb.data_start_address + inode->direct[0] * CLUSTER_SIZE + i * sizeof(struct directory_item);
-            fseek(g_system_state.file_ptr, offset, SEEK_SET);
-            fwrite(&empty_item, sizeof(struct directory_item), 1, g_system_state.file_ptr);
-        
+            // remove item from directory by moving last item to this position
+            struct directory_item last_item;
+            int last_offset = g_system_state.sb.data_start_address + inode->direct[0] * CLUSTER_SIZE + (record_count - 1) * sizeof(struct directory_item);
+            fseek(g_system_state.file_ptr, last_offset, SEEK_SET);
+            fread(&last_item, sizeof(struct directory_item), 1, g_system_state.file_ptr);
+            
+            // Write last item to deleted position
+            int deleted_offset = g_system_state.sb.data_start_address + inode->direct[0] * CLUSTER_SIZE + i * sizeof(struct directory_item);
+            fseek(g_system_state.file_ptr, deleted_offset, SEEK_SET);
+            fwrite(&last_item, sizeof(struct directory_item), 1, g_system_state.file_ptr);
+            
+            // Clear the old last position (only if it's different from deleted position)
+            if (i != record_count - 1) {
+                struct directory_item empty_item = {0};
+                fseek(g_system_state.file_ptr, last_offset, SEEK_SET);
+                fwrite(&empty_item, sizeof(struct directory_item), 1, g_system_state.file_ptr);
+            }
+            
             inode->file_size -= sizeof(struct directory_item);
             write_inode(inode);
+
+            inode_to_delete.references -= 1;
+            if(inode_to_delete.references == 0){
+                clear_inode(&inode_to_delete);
+            }
             
             break;
         }
@@ -539,41 +552,44 @@ int delete_item(struct inode* inode, char* item_name){
     return EXIT_SUCCESS;
 }
 
-int add_record_to_dir(struct directory_item record, struct inode* inode){ 
-    struct directory_item* node_data = get_directory_items(inode);
-    if(node_data == NULL) return EXIT_FAILURE;
+int add_record_to_dir(struct directory_item record, struct inode* dir_inode){ 
+    struct inode added_inode = get_inode(record.inode);
+    added_inode.references += 1;
+    write_inode(&added_inode);
 
-    int record_count = inode->file_size / sizeof(struct directory_item);
-    int final_offset;
-    int empty_space_found = 0;
+    // Always append to the end since we compact on deletion
+    int final_offset = g_system_state.sb.data_start_address + dir_inode->direct[0] * CLUSTER_SIZE + dir_inode->file_size;
 
-    // look for empty spaces between records to fill
-    struct directory_item current;
-    for (int i = 0; i < record_count; i++){
-        current = node_data[i];
-        if (!current.item_name[0]){
-            empty_space_found = 1;
-            int offset_in_cluster = (i * sizeof(struct directory_item)) % CLUSTER_SIZE;
-            int item_addr = inode->direct[0] * CLUSTER_SIZE + offset_in_cluster;
-            final_offset = g_system_state.sb.data_start_address + item_addr;
-            break;
-        }
-    }
-
-    // if all of them are full, append this one to end of the directory
-    if(!empty_space_found){
-        final_offset = g_system_state.sb.data_start_address + inode->direct[0] * CLUSTER_SIZE + inode->file_size;
-    }
-
-    // printf("final offset in addrecord to dir: %d\n", final_offset);
     fseek(g_system_state.file_ptr, final_offset, SEEK_SET);
     fwrite(&record, sizeof(struct directory_item), 1, g_system_state.file_ptr);
 
-    inode->file_size += sizeof(struct directory_item);
-    write_inode(inode);
+    dir_inode->file_size += sizeof(struct directory_item);
+    write_inode(dir_inode);
 
-    free(node_data);
     return EXIT_SUCCESS;
+}
+
+// Initialize a directory with . and .. entries
+void init_directory(struct inode* dir_inode, int parent_inode_id) {
+    struct directory_item entries[2] = {0};
+    
+    // Parent reference (..)
+    entries[0].inode = parent_inode_id;
+    strlcpy(entries[0].item_name, "..", sizeof(entries[0].item_name));
+    
+    // Self reference (.)
+    entries[1].inode = dir_inode->id;
+    strlcpy(entries[1].item_name, ".", sizeof(entries[1].item_name));
+    
+    // Write both entries directly to the first cluster
+    int offset = g_system_state.sb.data_start_address + dir_inode->direct[0] * CLUSTER_SIZE;
+    fseek(g_system_state.file_ptr, offset, SEEK_SET);
+    fwrite(entries, sizeof(struct directory_item), 2, g_system_state.file_ptr);
+    fflush(g_system_state.file_ptr);
+    
+    // Update directory size
+    dir_inode->file_size = 2 * sizeof(struct directory_item);
+    write_inode(dir_inode);
 }
 
 int create_dir_node(int up_ref_id){
@@ -581,16 +597,11 @@ int create_dir_node(int up_ref_id){
     memset(&inode, 0, sizeof(struct inode));
     inode.is_file = false;
     inode.id = assign_empty_inode();
-
     inode.direct[0] = assign_empty_cluster();
-    struct directory_item up_ref = {up_ref_id,"..\0\0\0\0\0\0\0\0\0\0"};
-    struct directory_item self_ref = {inode.id,".\0\0\0\0\0\0\0\0\0\0\0"}; 
-
-    add_record_to_dir(up_ref, &inode);
-    add_record_to_dir(self_ref, &inode);
-
     write_inode(&inode);
-    printf("root node size = %d", inode.file_size);
+
+    // Initialize directory with . and .. entries
+    init_directory(&inode, up_ref_id);
 
     return inode.id;
 }

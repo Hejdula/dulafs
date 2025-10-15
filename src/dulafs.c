@@ -144,7 +144,7 @@ int contains_file(struct inode* inode, char* file_name){
         return 0;
     }
     
-    struct directory_item* dir_content = (struct directory_item*) get_node_data(inode);
+    struct directory_item* dir_content = get_directory_items(inode);
     if (!dir_content) return 0;
     
     int record_count = inode->file_size / sizeof(struct directory_item);
@@ -168,7 +168,7 @@ char* inode_to_path(int inode_id){
     if (!path) return NULL;
     path[0] = '\0';
     while (prev_inode_id != ROOT_NODE) {
-        struct directory_item* dir_content = (struct directory_item*) get_node_data(&curr_inode);
+        struct directory_item* dir_content = get_directory_items(&curr_inode);
         if (prev_inode_id != -1) {
             int record_found = 0;
             int record_count = curr_inode.file_size / sizeof(struct directory_item);
@@ -222,7 +222,7 @@ int path_to_inode(char* path){
             fprintf(stderr, "file: \"%s\" can not be traversed like a directory\n", token);
             return -1;
         }
-        struct directory_item* node_data = (struct directory_item*) get_node_data(&inode);
+        struct directory_item* node_data = get_directory_items(&inode);
         int record_count = inode.file_size / sizeof(struct directory_item);
         int node_found = 0;
         for (int i = 0; i < record_count; i++){
@@ -423,6 +423,41 @@ uint8_t* get_node_data(struct inode* inode){
     return data;
 };
 
+// Returns a malloc'd array of directory items
+struct directory_item* get_directory_items(struct inode* dir_inode) {
+    if (dir_inode->file_size == 0) {
+        fprintf(stderr, "Error: Directory inode has file_size == 0.\n");
+        return NULL;
+    }
+
+    struct directory_item* cluster_data = malloc(CLUSTER_SIZE);
+    if (!cluster_data) { return NULL; }
+
+    int valid_record_count = dir_inode->file_size / sizeof(struct directory_item);
+    struct directory_item* dir_records = malloc(valid_record_count * sizeof(struct directory_item)); 
+    if (!dir_records) { free(cluster_data); return NULL; }
+
+    fseek(g_system_state.file_ptr, dir_inode->direct[0] * CLUSTER_SIZE + g_system_state.sb.data_start_address, SEEK_SET);
+    fread(cluster_data, CLUSTER_SIZE, 1, g_system_state.file_ptr);
+
+    int max_record_count = CLUSTER_SIZE / sizeof(struct directory_item);
+    int record_count = 0;
+    for (int i = 0; i < max_record_count; i++) {
+        if (cluster_data[i].item_name[0]) {
+            dir_records[record_count] = cluster_data[i];
+            record_count++;
+        }
+    }
+
+    if(record_count != valid_record_count){
+        printf("Eror in directory inode size compared to valid records, this should not happen\n");
+    }
+
+    free(cluster_data);
+    return dir_records;
+}
+
+
 void delete_inode(struct inode* inode){ 
     // set the inode as free in bitmap
     clear_bit(inode->id, g_system_state.sb.bitmapi_start_address);
@@ -443,7 +478,7 @@ int delete_item(struct inode* inode, char* item_name){
         fprintf(stderr, "not a directory\n");
         return EXIT_FAILURE;
     }
-    struct directory_item* dir_content = (struct directory_item*) get_node_data(inode);
+    struct directory_item* dir_content = get_directory_items(inode);
     int record_count = inode->file_size / sizeof(struct directory_item);
     int item_found = 0;
     // loop through directory items to find the one to delete
@@ -471,8 +506,8 @@ int delete_item(struct inode* inode, char* item_name){
             
             break;
         }
-
     }
+
     free(dir_content);
     if(!item_found){
         fprintf(stderr, "Could not find %s\n", item_name);
@@ -482,7 +517,7 @@ int delete_item(struct inode* inode, char* item_name){
 }
 
 int add_record_to_dir(struct directory_item record, struct inode* inode){ 
-    struct directory_item* node_data = (struct directory_item*) get_node_data(inode);
+    struct directory_item* node_data = get_directory_items(inode);
 
     if(inode->file_size == 0){
         inode->direct[0] = assign_empty_cluster();
@@ -515,6 +550,7 @@ int add_record_to_dir(struct directory_item record, struct inode* inode){
     fwrite(&record, sizeof(struct directory_item), 1, g_system_state.file_ptr);
 
     inode->file_size += sizeof(struct directory_item);
+    printf("inode size: %d\n", inode->file_size);
     write_inode(inode);
 
     free(node_data);

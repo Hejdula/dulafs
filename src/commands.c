@@ -88,22 +88,55 @@ int cmd_cp(int argc, char** argv) {
         offset = new_clusters[cluster_index] * CLUSTER_SIZE + g_system_state.sb.data_start_address;
         fseek(g_system_state.file_ptr, offset, SEEK_SET);
         fwrite(current_cluster_data, bytes_to_read, 1, g_system_state.file_ptr);
-        fflush(g_system_state.file_ptr);
     }
     free(current_cluster_data);
     free(original_clusters);
     free(new_clusters);
-
+    
     struct directory_item item = {0};
     item.inode = new_inode_id;
     strlcpy(item.item_name, file_name, sizeof(item.item_name));
     
     add_record_to_dir(item, &target_dir); 
+    fflush(g_system_state.file_ptr);
 
     return EXIT_SUCCESS;
 }
-int cmd_mv(int argc, char** argv) { printf("TODO: Move function called\n"); return 0; }
-int cmd_rm(int argc, char** argv) { printf("TODO: Remove function called\n"); return 0; }
+int cmd_mv(int argc, char** argv) {
+    int inode_to_move_id = path_to_inode(argv[1]);
+    return EXIT_SUCCESS;
+}
+int cmd_rm(int argc, char** argv) {
+    // separate name of the dir from path
+    char target_path[MAX_DIR_PATH];
+    char* file_name;
+    strcpy(target_path, argv[1]);
+    char* last_slash_ptr = strrchr(target_path, '/');
+    if (last_slash_ptr) {
+        file_name = last_slash_ptr + 1;
+        target_path[last_slash_ptr - target_path] = '\0';
+    } else {
+        file_name = argv[1];
+        target_path[0] = '\0';
+    }
+
+    int dir_id = path_to_inode(target_path);
+    if (dir_id == -1) return  EXIT_FAILURE;
+    struct inode dir_inode = get_inode(dir_id); 
+
+    int inode_id = path_to_inode(argv[1]);
+    if (inode_id == -1) return EXIT_FAILURE;
+    struct inode inode = get_inode(inode_id);
+    if (!inode.is_file){
+        printf("Not a file");
+        return EXIT_FAILURE;
+    }
+
+    delete_item(&dir_inode, file_name); 
+    delete_inode(&inode);
+    fflush(g_system_state.file_ptr); 
+    return EXIT_SUCCESS;
+}
 
 int cmd_mkdir(int argc, char** argv) {
     
@@ -169,15 +202,22 @@ int cmd_rmdir(int argc, char** argv) {
 }
     
 int cmd_ls(int argc, char** argv) {
-    struct inode curr_inode = get_inode(g_system_state.curr_node_id);
-    struct directory_item* dir_content = (struct directory_item*) get_node_data(&curr_inode);
-    int record_count = curr_inode.file_size / sizeof(struct directory_item);
-    for (int i = 0; i < record_count; i++){
-        if (dir_content[i].item_name[0]){
-            printf("%s : %d\n",dir_content[i].item_name, dir_content[i].inode);
-        }
+
+    struct inode curr_inode;
+    if (argc == 2){
+        int inode_id = path_to_inode(argv[1]);
+        if (inode_id == -1) return EXIT_FAILURE;
+        curr_inode = get_inode(inode_id);
+    } else {
+        curr_inode = get_inode(g_system_state.curr_node_id);     
     }
 
+    struct directory_item* dir_content = get_directory_items(&curr_inode);
+    if (!dir_content) return EXIT_FAILURE;
+    int record_count = curr_inode.file_size / sizeof(struct directory_item);
+    for (int i = 0; i < record_count; i++){
+        printf("%s : %d\n", dir_content[i].item_name, dir_content[i].inode);
+    }
     free(dir_content);
     return EXIT_SUCCESS;
 }

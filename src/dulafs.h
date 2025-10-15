@@ -65,6 +65,7 @@ uint8_t* get_node_data(struct inode* inode);
 int* get_node_clusters(struct inode* inode);
 struct inode get_inode(int node_id);
 int contains_file(struct inode* inode, char* file_name);
+struct directory_item* get_directory_items(struct inode* dir_node);
 
 
 void delete_inode(struct inode *inode);

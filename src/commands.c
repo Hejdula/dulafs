@@ -24,7 +24,84 @@ int cmd_format(int argc, char** argv) {
     }
     return format((int)size);
 }
-int cmd_cp(int argc, char** argv) { printf("TODO: Copy function called\n"); return 0; }
+int cmd_cp(int argc, char** argv) {
+    // get inode to copy
+    int original_inode_id = path_to_inode(argv[1]); 
+    if(original_inode_id == -1) return EXIT_FAILURE;
+    struct inode original_node = get_inode(original_inode_id);
+
+    // separate name of the dir from path
+    char target_path[MAX_DIR_PATH];
+    char* file_name;
+    strcpy(target_path, argv[2]);
+    char* last_slash_ptr = strrchr(target_path, '/');
+    if (last_slash_ptr) {
+        file_name = last_slash_ptr + 1;
+        target_path[last_slash_ptr - target_path] = '\0';
+    } else {
+        file_name = argv[2];
+        target_path[0] = '\0';
+    }
+ 
+    int target_dir_id = path_to_inode(target_path);
+    if (target_dir_id == -1) return EXIT_FAILURE;
+    struct inode target_dir = get_inode(target_dir_id);
+
+    int new_inode_id = assign_empty_inode();
+    if(new_inode_id == -1) return EXIT_FAILURE;
+    struct inode new_inode = {0};
+    new_inode.id = new_inode_id;
+    new_inode.file_size = original_node.file_size;
+    new_inode.is_file = 1; 
+    write_inode(&new_inode);
+    
+    int* new_clusters = assign_node_clusters(&new_inode);
+    int* original_clusters = get_node_clusters(&original_node);
+    if (original_clusters == NULL) {
+        delete_inode(&new_inode);
+        return EXIT_FAILURE;
+    }
+
+    int cluster_count = (original_node.file_size + CLUSTER_SIZE - 1) / CLUSTER_SIZE;
+    printf("cluster count: %d", cluster_count);
+    int offset;
+    uint8_t* current_cluster_data = malloc(CLUSTER_SIZE);
+    for (int cluster_index = 0; cluster_index < cluster_count; cluster_index++){ 
+        // Zero out the buffer to avoid writing uninitialized data
+        memset(current_cluster_data, 0, CLUSTER_SIZE);
+        
+        // Calculate bytes to read for this cluster
+        int bytes_to_read = CLUSTER_SIZE;
+        if (cluster_index == cluster_count - 1 && original_node.file_size % CLUSTER_SIZE != 0) {
+            bytes_to_read = original_node.file_size % CLUSTER_SIZE;
+        }
+        
+        
+        // read from original
+        printf("read from %d", original_clusters[cluster_index]);
+        offset = original_clusters[cluster_index] * CLUSTER_SIZE + g_system_state.sb.data_start_address;
+        fseek(g_system_state.file_ptr, offset, SEEK_SET);
+        fread(current_cluster_data, bytes_to_read, 1, g_system_state.file_ptr); 
+        
+        // write to new one
+        printf("write to %d", new_clusters[cluster_index]);
+        offset = new_clusters[cluster_index] * CLUSTER_SIZE + g_system_state.sb.data_start_address;
+        fseek(g_system_state.file_ptr, offset, SEEK_SET);
+        fwrite(current_cluster_data, bytes_to_read, 1, g_system_state.file_ptr);
+        fflush(g_system_state.file_ptr);
+    }
+    free(current_cluster_data);
+    free(original_clusters);
+    free(new_clusters);
+
+    struct directory_item item = {0};
+    item.inode = new_inode_id;
+    strlcpy(item.item_name, file_name, sizeof(item.item_name));
+    
+    add_record_to_dir(item, &target_dir); 
+
+    return EXIT_SUCCESS;
+}
 int cmd_mv(int argc, char** argv) { printf("TODO: Move function called\n"); return 0; }
 int cmd_rm(int argc, char** argv) { printf("TODO: Remove function called\n"); return 0; }
 

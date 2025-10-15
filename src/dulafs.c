@@ -510,11 +510,6 @@ int add_record_to_dir(struct directory_item record, struct inode* inode){
         final_offset = g_system_state.sb.data_start_address + inode->direct[0] * CLUSTER_SIZE + inode->file_size;
     }
 
-    if(!final_offset){
-        free(node_data);
-        return EXIT_FAILURE;
-    }
-
     printf("final offset in addrecord to dir: %d\n", final_offset);
     fseek(g_system_state.file_ptr, final_offset, SEEK_SET);
     fwrite(&record, sizeof(struct directory_item), 1, g_system_state.file_ptr);

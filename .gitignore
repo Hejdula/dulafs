@@ -3,6 +3,7 @@
 
 *.ula
 test_file
+hello
 
 ### Vscode ###
 .vscode

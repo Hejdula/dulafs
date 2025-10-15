@@ -523,8 +523,6 @@ int delete_item(struct inode* inode, char* item_name){
             int offset = g_system_state.sb.data_start_address + inode->direct[0] * CLUSTER_SIZE + i * sizeof(struct directory_item);
             fseek(g_system_state.file_ptr, offset, SEEK_SET);
             fwrite(&empty_item, sizeof(struct directory_item), 1, g_system_state.file_ptr);
-
-            clear_inode(&inode_to_delete); 
         
             inode->file_size -= sizeof(struct directory_item);
             write_inode(inode);

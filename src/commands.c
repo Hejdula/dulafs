@@ -99,7 +99,6 @@ int cmd_mv(int argc, char** argv) {
     // source directory
     int from_dir_id = path_to_dir_inode(argv[1]); 
     if (from_dir_id == -1){ return EXIT_FAILURE; }
-    struct inode from_dir_inode = get_inode(from_dir_id);
     
     // destination directory
     int to_dir_id = path_to_dir_inode(argv[2]);
@@ -127,6 +126,10 @@ int cmd_mv(int argc, char** argv) {
         printf("could not add file to directory\n");
         return EXIT_FAILURE;
     }
+    
+    // the source dir inode needs to be loaded now because the destination dir may be same as source dir,
+    // changing it in file but not the struct in code
+    struct inode from_dir_inode = get_inode(from_dir_id);
     delete_item(&from_dir_inode, from_file_name);
 
     return EXIT_SUCCESS;
@@ -175,6 +178,7 @@ int cmd_rmdir(int argc, char** argv) {
     int target_node_id = path_to_dir_inode(argv[1]);
     struct inode target_inode = get_inode(target_node_id);
     delete_item(&target_inode, dir_name);
+    clear_inode(&target_inode);
 
     return EXIT_SUCCESS;
 }

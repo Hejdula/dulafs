@@ -528,6 +528,8 @@ int delete_item(struct inode* inode, char* item_name){
             inode_to_delete.references -= 1;
             if(inode_to_delete.references <= 0){
                 clear_inode(&inode_to_delete);
+            } else {
+                write_inode(&inode_to_delete);
             }
             
             break;

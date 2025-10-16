@@ -47,6 +47,7 @@ int cmd_cp(int argc, char** argv) {
         return EXIT_FAILURE;
     }
 
+    // create new inode
     int new_inode_id = assign_empty_inode();
     if(new_inode_id == -1) return EXIT_FAILURE;
     struct inode new_inode = {0};
@@ -153,10 +154,19 @@ int cmd_mv(int argc, char** argv) {
 }
 
 int cmd_rm(int argc, char** argv) {
+    // separate name of the file from path
+    char* file_name = get_final_token(argv[1]); 
+    if (!file_name || file_name[0] == '\0') {
+        fprintf(stderr, "File name cannot be empty\n");
+        return EXIT_FAILURE;
+    }
+ 
+    // get target directory
+    int target_dir_id = path_to_dir_inode(argv[1]);
+    if (target_dir_id == -1) return EXIT_FAILURE;
+    struct inode target_dir = get_inode(target_dir_id);
 
-
-    fflush(g_system_state.file_ptr); 
-    return EXIT_SUCCESS;
+    return delete_item(&target_dir, file_name);
 }
 
 int cmd_mkdir(int argc, char** argv) {

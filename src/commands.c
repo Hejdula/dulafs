@@ -29,7 +29,7 @@ int cmd_cp(int argc, char** argv) {
     if(original_inode_id == -1) return EXIT_FAILURE;
     struct inode original_node = get_inode(original_inode_id);
 
-    // separate name of the file from path using helper function
+    // separate name of the file from path
     char* file_name = get_final_token(argv[2]);
     
     if (!file_name || file_name[0] == '\0') {
@@ -62,6 +62,7 @@ int cmd_cp(int argc, char** argv) {
         return EXIT_FAILURE;
     }
 
+    // copy the data to new inode
     int cluster_count = (original_node.file_size + CLUSTER_SIZE - 1) / CLUSTER_SIZE;
     printf("cluster count: %d", cluster_count);
     int offset;
@@ -415,6 +416,42 @@ int cmd_outcp(int argc, char** argv) {
 }
 int cmd_load(int argc, char** argv) { printf("TODO: Load function called\n"); return 0; }
 int cmd_statfs(int argc, char** argv) { printf("TODO: Status filesystem function called\n"); return 0; }
+int ln(int argc, char** argv) {
+    // get inode to link
+    int original_inode_id = path_to_inode(argv[1]);
+    if(original_inode_id == -1) return EXIT_FAILURE;
+    struct inode original_node = get_inode(original_inode_id);
+    if(!original_node.is_file){
+        printf("can not hard link a directory");
+        return EXIT_FAILURE;
+    }
+
+    // separate name of the file from path
+    char* file_name = get_final_token(argv[2]); 
+    if (!file_name || file_name[0] == '\0') {
+        fprintf(stderr, "File name cannot be empty\n");
+        return EXIT_FAILURE;
+    }
+ 
+    // get target directory
+    int target_dir_id = path_to_dir_inode(argv[2]);
+    if (target_dir_id == -1) return EXIT_FAILURE;
+    struct inode target_dir = get_inode(target_dir_id);
+
+    // check if file already exists
+    if (contains_file(&target_dir, file_name)){
+        fprintf(stderr, "Directory or file \"%s\"with the same name already exists\n", argv[2]);
+        return EXIT_FAILURE;
+    }
+
+    // finally add the entry to directory
+    struct directory_item record = {0};
+    record.inode = original_inode_id;
+    strlcpy(record.item_name, file_name, DIR_NAME_SIZE);
+    add_record_to_dir(record, &target_dir);
+
+    return EXIT_SUCCESS;
+};
 
 // Array of command structs - combines name and function in one place
 struct CommandEntry commands[] = {
@@ -433,7 +470,8 @@ struct CommandEntry commands[] = {
     {"outcp", cmd_outcp, 2},
     {"load", cmd_load, 0},
     {"statfs", cmd_statfs, 0},
-    {"test", test, -1},
+    {"ln", ln, 2},
+    {"test", test, -1}
 };
 
 // Number of commands

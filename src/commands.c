@@ -228,21 +228,13 @@ int cmd_ls(int argc, char** argv) {
     int record_count = curr_inode.file_size / sizeof(struct directory_item);
     for (int i = 0; i < record_count; i++){
         struct inode item_inode = get_inode(dir_content[i].inode);
-        if (item_inode.is_file) {
-            // White/default color for files
-            printf("%-12s | inode: %3d | size: %6d bytes | refs: %d\n", 
-                   dir_content[i].item_name, 
-                   dir_content[i].inode,
-                   item_inode.file_size,
-                   item_inode.references);
-        } else {
-            // Blue color for directories
-            printf("\033[34m%-12s\033[0m | inode: %3d | size: %6d bytes | refs: %d\n", 
-                   dir_content[i].item_name, 
-                   dir_content[i].inode,
-                   item_inode.file_size,
-                   item_inode.references);
-        }
+        const char* color = item_inode.is_file ? "" : "\033[34m";
+        printf("%s%-12s\033[0m | inode: %3d | size: %6d bytes | refs: %d\n", 
+               color,
+               dir_content[i].item_name,
+               dir_content[i].inode,
+               item_inode.file_size,
+               item_inode.references);
     }
     free(dir_content);
     return EXIT_SUCCESS;
@@ -288,14 +280,39 @@ int cmd_cd(int argc, char** argv) {
 
 int cmd_pwd(int argc, char** argv) {
     char* path = inode_to_path(g_system_state.curr_node_id);
-    if(path == NULL) return EXIT_FAILURE;
+    if(path == NULL){ return EXIT_FAILURE;}
     printf("working directory: %s\n", path);
     free(path);
     return EXIT_SUCCESS;
 }
 
 int cmd_info(int argc, char** argv) {
-    
+    char* name = get_final_token(argv[1]);
+    if (!name || name[0] == '\0') {
+        fprintf(stderr, "Name cannot be empty\n");
+        return EXIT_FAILURE;
+    }
+    int inode_id = path_to_inode(argv[1]);
+    if (inode_id == -1){ return EXIT_FAILURE;}
+    struct inode inode = get_inode(inode_id);
+    int cluster_count = (inode.file_size + CLUSTER_SIZE -1) / CLUSTER_SIZE;
+    int* clusters = get_node_clusters(&inode);
+
+    const char* color = inode.is_file ? "" : "\033[34m";
+    printf("%s%-12s\033[0m | inode: %4d | size: %6d bytes | refs: %2d", 
+            color,
+            name,
+            inode.id,
+            inode.file_size,
+            inode.references);
+    printf(" | clusters: [");
+    for (int i = 0; i < cluster_count - 1; i++){
+        printf("%d, ", clusters[1]);
+    }
+    printf("%d]\n", clusters[cluster_count - 1]);
+    fflush(stdout);
+
+    free(clusters);    
     return EXIT_SUCCESS;
 }
 
@@ -344,6 +361,9 @@ int cmd_incp(int argc, char** argv) {
     item.inode = inode.id;
     strlcpy(item.item_name, file_name, sizeof(item.item_name));
     add_record_to_dir(item, &target_dir);
+
+    // Reload inode to get updated reference count and continue with file data
+    inode = get_inode(new_node_id);
 
     // assign clusters to this inode
     int* clusters = assign_node_clusters(&inode);

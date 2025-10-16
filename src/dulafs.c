@@ -103,7 +103,6 @@ void write_inode(struct inode* inode){
     fflush(g_system_state.file_ptr);
 }
 
-
 int get_empty_index(int bitmap_offset){
     int byte_index = 0;
     int bit_offset = 0;
@@ -527,7 +526,7 @@ int delete_item(struct inode* inode, char* item_name){
             
             
             inode_to_delete.references -= 1;
-            if(inode_to_delete.references == 0){
+            if(inode_to_delete.references <= 0){
                 clear_inode(&inode_to_delete);
             }
             

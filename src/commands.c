@@ -12,44 +12,42 @@
 int cmd_format(int argc, char** argv) {
 
     if(argc != 2){
-        return EXIT_FAILURE;
+        return ERR_INVALID_ARGC;
     }
 
     char* endptr;
     long size = strtol(argv[1], &endptr, 10);
     if (*endptr != '\0' || size <= 0) {
-        fprintf(stderr, "Invalid size argument: %s\n", argv[1]);
-        return EXIT_FAILURE;
+        return ERR_INVALID_SIZE;
     }
-    return format((int)size);
+    format((int)size);
+    return ERR_SUCCESS;
 }
 int cmd_cp(int argc, char** argv) {
     // get inode to copy
     int original_inode_id = path_to_inode(argv[1]); 
-    if(original_inode_id == -1) return EXIT_FAILURE;
+    if(original_inode_id < 0) return -original_inode_id;
     struct inode original_node = get_inode(original_inode_id);
 
     // separate name of the file from path
     char* file_name = get_final_token(argv[2]);
     
     if (!file_name || file_name[0] == '\0') {
-        fprintf(stderr, "File name cannot be empty\n");
-        return EXIT_FAILURE;
+        return ERR_FILE_NAME_EMPTY;
     }
  
     int target_dir_id = path_to_dir_inode(argv[2]);
-    if (target_dir_id == -1) return EXIT_FAILURE;
+    if (target_dir_id < 0) return -target_dir_id;
     struct inode target_dir = get_inode(target_dir_id);
 
     // check if file already exists
     if (contains_file(&target_dir, file_name)){
-        fprintf(stderr, "Directory or file \"%s\"with the same name already exists\n", argv[2]);
-        return EXIT_FAILURE;
+        return ERR_FILE_EXISTS;
     }
 
     // create new inode
     int new_inode_id = assign_empty_inode();
-    if(new_inode_id == -1) return EXIT_FAILURE;
+    if(new_inode_id == -1) return ERR_INODE_FULL;
     struct inode new_inode = {0};
     new_inode.id = new_inode_id;
     new_inode.file_size = original_node.file_size;
@@ -60,7 +58,7 @@ int cmd_cp(int argc, char** argv) {
     int* original_clusters = get_node_clusters(&original_node);
     if (original_clusters == NULL) {
         clear_inode(&new_inode);
-        return EXIT_FAILURE;
+        return ERR_MEMORY_ALLOCATION;
     }
 
     // copy the data to new inode
@@ -102,47 +100,44 @@ int cmd_cp(int argc, char** argv) {
     add_record_to_dir(item, &target_dir); 
     fflush(g_system_state.file_ptr);
 
-    return EXIT_SUCCESS;
+    return ERR_SUCCESS;
 }
 int cmd_mv(int argc, char** argv) { 
     char* to_file_name = get_final_token(argv[2]);
     char* from_file_name = get_final_token(argv[1]);
     
     if (!to_file_name || to_file_name[0] == '\0') {
-        fprintf(stderr, "File name cannot be empty\n");
-        return EXIT_FAILURE;
+        return ERR_FILE_NAME_EMPTY;
     }
     
     // source directory
     int from_dir_id = path_to_dir_inode(argv[1]); 
-    if (from_dir_id == -1){ return EXIT_FAILURE; }
+    if (from_dir_id < 0){ return -from_dir_id; }
     
     // destination directory
     int to_dir_id = path_to_dir_inode(argv[2]);
-    if (to_dir_id == -1){ return EXIT_FAILURE; }
+    if (to_dir_id < 0){ return -to_dir_id; }
     struct inode to_dir_inode = get_inode(to_dir_id); 
     
     // source file
     int from_inode_id = path_to_inode(argv[1]);
-    if (from_inode_id == -1){ return EXIT_FAILURE;}
+    if (from_inode_id < 0){ return -from_inode_id;}
     struct inode from_inode = get_inode(from_inode_id);
 
     if (!from_inode.is_file){
-        printf("%s is not a file\n", argv[1]);
-        return EXIT_FAILURE;
+        return ERR_NOT_A_FILE;
     }
 
     if (contains_file(&to_dir_inode, to_file_name)){
-        fprintf(stderr, "Directory or file \"%s\"with the same name already exists\n", argv[2]);
-        return EXIT_FAILURE;
+        return ERR_FILE_EXISTS;
     }
 
     struct directory_item new_record = {0};
     new_record.inode = from_inode_id;
     strlcpy(new_record.item_name, to_file_name, sizeof(char[DIR_NAME_SIZE]));
-    if (add_record_to_dir(new_record, &to_dir_inode)) { 
-        printf("could not add file to directory\n");
-        return EXIT_FAILURE;
+    int ret = add_record_to_dir(new_record, &to_dir_inode);
+    if (ret) { 
+        return ret;
     }
     
     // the source dir inode needs to be loaded now because the destination dir may be same as source dir,
@@ -150,20 +145,19 @@ int cmd_mv(int argc, char** argv) {
     struct inode from_dir_inode = get_inode(from_dir_id);
     delete_item(&from_dir_inode, from_file_name);
 
-    return EXIT_SUCCESS;
+    return ERR_SUCCESS;
 }
 
 int cmd_rm(int argc, char** argv) {
     // separate name of the file from path
     char* file_name = get_final_token(argv[1]); 
     if (!file_name || file_name[0] == '\0') {
-        fprintf(stderr, "File name cannot be empty\n");
-        return EXIT_FAILURE;
+        return ERR_FILE_NAME_EMPTY;
     }
  
     // get target directory
     int target_dir_id = path_to_dir_inode(argv[1]);
-    if (target_dir_id == -1) return EXIT_FAILURE;
+    if (target_dir_id < 0) return -target_dir_id;
     struct inode target_dir = get_inode(target_dir_id);
 
     return delete_item(&target_dir, file_name);
@@ -175,22 +169,19 @@ int cmd_mkdir(int argc, char** argv) {
     char* dir_name = get_final_token(argv[1]);
     
     if (!dir_name || dir_name[0] == '\0') {
-        fprintf(stderr, "Directory name cannot be empty\n");
-        return EXIT_FAILURE;
+        return ERR_FILE_NAME_EMPTY;
     }
     
     int paretn_dir_id = path_to_dir_inode(argv[1]);
+    if (paretn_dir_id < 0) return -paretn_dir_id;
     struct inode parent_inode = get_inode(paretn_dir_id);
-    if (paretn_dir_id == -1) return EXIT_FAILURE;
     if (parent_inode.is_file) {
-        printf("Path does not exist\n");
-        return EXIT_FAILURE;
+        return ERR_PATH_NOT_EXIST;
     }
 
     // check if the file name already is there
     if (contains_file(&parent_inode, dir_name)){
-        fprintf(stderr, "Directory or file \"%s\" with the same name already exists\n", argv[1]);
-        return EXIT_FAILURE;
+        return ERR_FILE_EXISTS;
     }
 
     // create new directory node
@@ -203,14 +194,13 @@ int cmd_mkdir(int argc, char** argv) {
 
     add_record_to_dir(dir_record, &parent_inode);
 
-    return EXIT_SUCCESS;
+    return ERR_SUCCESS;
 }
 
 int cmd_rmdir(int argc, char** argv) {
 
     if (!strcmp(argv[1],".") || !strcmp(argv[1],"..")){
-        printf("can not remove \".\" or \"..\" from directory");
-        return EXIT_FAILURE;
+        return ERR_CANNOT_REMOVE_DOT;
     }
 
     // separate name of the dir from path using helper function
@@ -218,9 +208,7 @@ int cmd_rmdir(int argc, char** argv) {
     
     int target_node_id = path_to_dir_inode(argv[1]);
     struct inode target_inode = get_inode(target_node_id);
-    delete_item(&target_inode, dir_name);
-
-    return EXIT_SUCCESS;
+    return delete_item(&target_inode, dir_name);
 }
     
 int cmd_ls(int argc, char** argv) {
@@ -228,14 +216,14 @@ int cmd_ls(int argc, char** argv) {
     struct inode curr_inode;
     if (argc == 2){
         int inode_id = path_to_inode(argv[1]);
-        if (inode_id == -1) return EXIT_FAILURE;
+        if (inode_id < 0) return -inode_id;
         curr_inode = get_inode(inode_id);
     } else {
         curr_inode = get_inode(g_system_state.curr_node_id);     
     }
 
     struct directory_item* dir_content = get_directory_items(&curr_inode);
-    if (!dir_content) return EXIT_FAILURE;
+    if (!dir_content) return ERR_MEMORY_ALLOCATION;
     int record_count = curr_inode.file_size / sizeof(struct directory_item);
     for (int i = 0; i < record_count; i++){
         struct inode item_inode = get_inode(dir_content[i].inode);
@@ -248,12 +236,12 @@ int cmd_ls(int argc, char** argv) {
                item_inode.references);
     }
     free(dir_content);
-    return EXIT_SUCCESS;
+    return ERR_SUCCESS;
 }
 
 int cmd_cat(int argc, char** argv) { 
     int node_id = path_to_inode(argv[1]);
-    if (node_id == -1) return EXIT_FAILURE;
+    if (node_id < 0) return -node_id;
     struct inode inode = get_inode(node_id);
     uint8_t* data = (uint8_t*)get_node_data(&inode);
     // printf("inode size: %d\n", inode.file_size);
@@ -267,18 +255,17 @@ int cmd_cat(int argc, char** argv) {
     putchar('\n');
 
     free(data);
-    return EXIT_SUCCESS;
+    return ERR_SUCCESS;
 }
 
 int cmd_cd(int argc, char** argv) {
     int new_node_id = path_to_inode(argv[1]);
-    if (new_node_id == -1){
-        return EXIT_FAILURE;
+    if (new_node_id < 0){
+        return -new_node_id;
     }
     struct inode node = get_inode(new_node_id);
     if (node.is_file){
-        fprintf(stderr, "%s not a directory", argv[1]);
-        return EXIT_FAILURE;
+        return ERR_NOT_A_DIRECTORY;
     }
 
     g_system_state.curr_node_id = new_node_id;
@@ -286,25 +273,24 @@ int cmd_cd(int argc, char** argv) {
     strlcpy(g_system_state.working_dir, new_path, sizeof(g_system_state.working_dir) - 1);
     free(new_path);
 
-    return EXIT_SUCCESS;
+    return ERR_SUCCESS;
 }
 
 int cmd_pwd(int argc, char** argv) {
     char* path = inode_to_path(g_system_state.curr_node_id);
-    if(path == NULL){ return EXIT_FAILURE;}
+    if(path == NULL){ return ERR_MEMORY_ALLOCATION;}
     printf("working directory: %s\n", path);
     free(path);
-    return EXIT_SUCCESS;
+    return ERR_SUCCESS;
 }
 
 int cmd_info(int argc, char** argv) {
     char* name = get_final_token(argv[1]);
     if (!name || name[0] == '\0') {
-        fprintf(stderr, "Name cannot be empty\n");
-        return EXIT_FAILURE;
+        return ERR_FILE_NAME_EMPTY;
     }
     int inode_id = path_to_inode(argv[1]);
-    if (inode_id == -1){ return EXIT_FAILURE;}
+    if (inode_id < 0){ return -inode_id;}
     struct inode inode = get_inode(inode_id);
     int cluster_count = (inode.file_size + CLUSTER_SIZE -1) / CLUSTER_SIZE;
     int* clusters = get_node_clusters(&inode);
@@ -324,7 +310,7 @@ int cmd_info(int argc, char** argv) {
     fflush(stdout);
 
     free(clusters);    
-    return EXIT_SUCCESS;
+    return ERR_SUCCESS;
 }
 
 int cmd_incp(int argc, char** argv) {
@@ -332,17 +318,15 @@ int cmd_incp(int argc, char** argv) {
     FILE* fptr = fopen(argv[1],"r");
 
     if (!fptr){
-        printf("File not found");
-        return EXIT_FAILURE;
+        return ERR_EXTERNAL_FILE_NOT_FOUND;
     }
     
     // separate name of the file from path using helper function
     char* file_name = get_final_token(argv[2]);
     
     if (!file_name || file_name[0] == '\0') {
-        fprintf(stderr, "File name cannot be empty\n");
         fclose(fptr);
-        return EXIT_FAILURE;
+        return ERR_FILE_NAME_EMPTY;
     }
     
     fseek(fptr, 0, SEEK_END);
@@ -358,15 +342,14 @@ int cmd_incp(int argc, char** argv) {
     inode.file_size = file_size;
     write_inode(&inode);
 
+    
     // get node_id of the directory
     int target_dir_id = path_to_dir_inode(argv[2]);
-    if(target_dir_id == -1){
+    if(target_dir_id < 0){
         clear_inode(&inode);
         fclose(fptr);
-        return EXIT_FAILURE;
-    }
-
-    // add the file into directory
+        return -target_dir_id;
+    }    // add the file into directory
     struct inode target_dir = get_inode(target_dir_id);
     struct directory_item item = {0};
     item.inode = inode.id;
@@ -406,52 +389,56 @@ int cmd_incp(int argc, char** argv) {
 
     fclose(fptr);
     free(clusters);
-    return EXIT_SUCCESS;
+    return ERR_SUCCESS;
 }
 
 int cmd_outcp(int argc, char** argv) {
     FILE* fptr = fopen(argv[2], "w+");
-    if(!fptr) return EXIT_FAILURE;
+    if(!fptr) return ERR_EXTERNAL_FILE_NOT_FOUND;
 
     int file_node_id= path_to_inode(argv[1]);
+    if (file_node_id < 0) {
+        fclose(fptr);
+        return -file_node_id;
+    }
     struct inode file_inode = get_inode(file_node_id);
 
     uint8_t* data = get_node_data(&file_inode);
 
-    if(!fwrite(data, file_inode.file_size, 1,fptr)) return EXIT_FAILURE;
+    if(!fwrite(data, file_inode.file_size, 1,fptr)) {
+        fclose(fptr);
+        return ERR_UNKNOWN;
+    }
 
     fclose(fptr);
 
-    return EXIT_SUCCESS;
+    return ERR_SUCCESS;
 }
-int cmd_load(int argc, char** argv) { printf("TODO: Load function called\n"); return 0; }
-int cmd_statfs(int argc, char** argv) { printf("TODO: Status filesystem function called\n"); return 0; }
+int cmd_load(int argc, char** argv) { printf("TODO: Load function called\n"); return ERR_SUCCESS; }
+int cmd_statfs(int argc, char** argv) { printf("TODO: Status filesystem function called\n"); return ERR_SUCCESS; }
 int ln(int argc, char** argv) {
     // get inode to link
     int original_inode_id = path_to_inode(argv[1]);
-    if(original_inode_id == -1) return EXIT_FAILURE;
+    if(original_inode_id < 0) return -original_inode_id;
     struct inode original_node = get_inode(original_inode_id);
     if(!original_node.is_file){
-        printf("can not hard link a directory");
-        return EXIT_FAILURE;
+        return ERR_CANNOT_HARDLINK_DIR;
     }
 
     // separate name of the file from path
     char* file_name = get_final_token(argv[2]); 
     if (!file_name || file_name[0] == '\0') {
-        fprintf(stderr, "File name cannot be empty\n");
-        return EXIT_FAILURE;
+        return ERR_FILE_NAME_EMPTY;
     }
  
     // get target directory
     int target_dir_id = path_to_dir_inode(argv[2]);
-    if (target_dir_id == -1) return EXIT_FAILURE;
+    if (target_dir_id < 0) return -target_dir_id;
     struct inode target_dir = get_inode(target_dir_id);
 
     // check if file already exists
     if (contains_file(&target_dir, file_name)){
-        fprintf(stderr, "Directory or file \"%s\"with the same name already exists\n", argv[2]);
-        return EXIT_FAILURE;
+        return ERR_FILE_EXISTS;
     }
 
     // finally add the entry to directory
@@ -460,7 +447,7 @@ int ln(int argc, char** argv) {
     strlcpy(record.item_name, file_name, DIR_NAME_SIZE);
     add_record_to_dir(record, &target_dir);
 
-    return EXIT_SUCCESS;
+    return ERR_SUCCESS;
 };
 
 // Array of command structs - combines name and function in one place

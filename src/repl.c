@@ -72,16 +72,22 @@ void repl(){
                     !(token_count - 1 == commands[i].arg_count) 
                     && commands[i].arg_count != -1
                 ){
-                    printf("invalid number of arguents for function %s, expected: %d, got %d\n", commands[i].name, commands[i].arg_count, token_count - 1);
-                    continue;
+                    printf("Invalid number of arguments for function %s, expected: %d, got %d\n", commands[i].name, commands[i].arg_count, token_count - 1);
+                    break;
                 }
                 // execute the command
-                int ret_val =  commands[i].function(token_count,args);
-                if (!ret_val){
-                    // printf("function returned with success\n");
+                int ret_val = commands[i].function(token_count, args);
+                if (ret_val == ERR_SUCCESS){
+                    // Command succeeded, no message needed
                 } else {
-                    printf("funciton returned with error\n");
-                };
+                    // Command failed, print error message
+                    const char* error_msg = get_error_message((ErrorCode)ret_val);
+                    if (error_msg) {
+                        fprintf(stderr, "Error: %s\n", error_msg);
+                    } else {
+                        fprintf(stderr, "Command returned with error code: %d\n", ret_val);
+                    }
+                }
                 break;
             }
         }

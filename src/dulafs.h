@@ -5,6 +5,29 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+// Error codes
+typedef enum {
+    ERR_SUCCESS = 0,
+    ERR_INVALID_SIZE,
+    ERR_PATH_NOT_EXIST,
+    ERR_NOT_A_DIRECTORY,
+    ERR_NOT_A_FILE,
+    ERR_FILE_NAME_EMPTY,
+    ERR_FILE_EXISTS,
+    ERR_INODE_FULL,
+    ERR_CLUSTER_FULL,
+    ERR_DIR_NOT_EMPTY,
+    ERR_FILE_NOT_FOUND,
+    ERR_MEMORY_ALLOCATION,
+    ERR_PATH_TOO_LONG,
+    ERR_CANNOT_TRAVERSE,
+    ERR_CANNOT_REMOVE_DOT,
+    ERR_EXTERNAL_FILE_NOT_FOUND,
+    ERR_CANNOT_HARDLINK_DIR,
+    ERR_INVALID_ARGC,
+    ERR_UNKNOWN
+} ErrorCode;
+
 #define MAX_DIR_PATH 1024
 #define DIRECT_CLUSTER_COUNT 5
 #define ROOT_NODE 0
@@ -79,9 +102,14 @@ int* assign_node_clusters(struct inode* inode);
 int format(int size);
 char* inode_to_path(int inode_id);
 int path_to_inode(char* path);
+int path_to_parent_inode(char* path, char** out_filename);
 char* get_final_token(char* path);
 int path_to_dir_inode(char* path);
 int delete_item(struct inode* inode, char* item_name);
+int find_item_in_dir(struct inode* dir_inode, char* item_name);
 int test();
+
+// Error message retrieval
+const char* get_error_message(ErrorCode code);
 
 #endif

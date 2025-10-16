@@ -16,6 +16,31 @@ struct SystemState g_system_state = {
     .sb = {0}
 };
 
+// Error message mapping
+const char* get_error_message(ErrorCode code) {
+    switch (code) {
+        case ERR_SUCCESS: return NULL;
+        case ERR_INVALID_SIZE: return "Invalid size argument";
+        case ERR_PATH_NOT_EXIST: return "Path does not exist";
+        case ERR_NOT_A_DIRECTORY: return "Not a directory";
+        case ERR_NOT_A_FILE: return "Not a file";
+        case ERR_FILE_NAME_EMPTY: return "File name cannot be empty";
+        case ERR_FILE_EXISTS: return "File or directory with the same name already exists";
+        case ERR_INODE_FULL: return "No free inodes available";
+        case ERR_CLUSTER_FULL: return "No free clusters available";
+        case ERR_DIR_NOT_EMPTY: return "Target directory is not empty";
+        case ERR_FILE_NOT_FOUND: return "File not found";
+        case ERR_MEMORY_ALLOCATION: return "Memory allocation failed";
+        case ERR_PATH_TOO_LONG: return "Path too long";
+        case ERR_CANNOT_TRAVERSE: return "Cannot traverse file as directory";
+        case ERR_CANNOT_REMOVE_DOT: return "Cannot remove '.' or '..' from directory";
+        case ERR_EXTERNAL_FILE_NOT_FOUND: return "External file not found";
+        case ERR_CANNOT_HARDLINK_DIR: return "Cannot hard link a directory";
+        case ERR_INVALID_ARGC: return "Invalid number of arguments";
+        default: return "Unknown error";
+    }
+}
+
 
 void set_bit(int i, int bitmap_offset){
     int byte_index = i/8;
@@ -226,8 +251,7 @@ int path_to_dir_inode(char* path){
 
 int path_to_inode(char* path){
     if (strlen(path) >= MAX_DIR_PATH){
-        fprintf(stderr, "Path too long\n");
-        return -1;
+        return -ERR_PATH_TOO_LONG;
     }
 
     int curr_node_id;
@@ -242,8 +266,7 @@ int path_to_inode(char* path){
         // if(!strcmp(token, ".")){ continue; }
         struct inode inode = get_inode(curr_node_id);
         if (inode.is_file){
-            fprintf(stderr, "file: \"%s\" can not be traversed like a directory\n", token);
-            return -1;
+            return -ERR_CANNOT_TRAVERSE;
         }
         struct directory_item* node_data = get_directory_items(&inode);
         int record_count = inode.file_size / sizeof(struct directory_item);
@@ -259,8 +282,7 @@ int path_to_inode(char* path){
         free(node_data);
 
         if (!node_found){
-            fprintf(stderr, "path does not exist: %s\n", path);
-            return -1;
+            return -ERR_PATH_NOT_EXIST;
         }
     }
     
@@ -495,8 +517,7 @@ void clear_inode(struct inode* inode){
 
 int delete_item(struct inode* inode, char* item_name){
     if (inode->is_file){
-        fprintf(stderr, "not a directory\n");
-        return EXIT_FAILURE;
+        return ERR_NOT_A_DIRECTORY;
     }
     struct directory_item* dir_content = get_directory_items(inode);
     int record_count = inode->file_size / sizeof(struct directory_item);
@@ -508,9 +529,8 @@ int delete_item(struct inode* inode, char* item_name){
             struct inode inode_to_delete = get_inode(dir_content[i].inode);
 
             if (inode_to_delete.file_size != 32 && !inode_to_delete.is_file) {
-                printf("Target directory is not empty\n");
                 free(dir_content);
-                return EXIT_FAILURE;
+                return ERR_DIR_NOT_EMPTY;
             }
             
             // remove item from directory by moving last item to this position
@@ -538,15 +558,14 @@ int delete_item(struct inode* inode, char* item_name){
     free(dir_content);
     
     if(!item_found){
-        fprintf(stderr, "Could not find %s\n", item_name);
-        return EXIT_FAILURE;
+        return ERR_FILE_NOT_FOUND;
     }
 
     // Decrease directory size
     inode->file_size -= sizeof(struct directory_item);
     write_inode(inode);
 
-    return EXIT_SUCCESS;
+    return ERR_SUCCESS;
 }
 
 int add_record_to_dir(struct directory_item record, struct inode* dir_inode){ 
@@ -628,11 +647,11 @@ int format(int size){
     printf("Inode start address: %d\n", sb.inode_start_address);
     printf("Data start address: %d\n", sb.data_start_address);
 
-    return 0;
+    return ERR_SUCCESS;
 }
 
 int test() {
     
     printf("=== Test Complete ===\n");
-    return 0;
+    return ERR_SUCCESS;
 }

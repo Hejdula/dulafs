@@ -23,10 +23,11 @@ int cmd_format(int argc, char** argv) {
     format((int)size);
     return ERR_SUCCESS;
 }
+
 int cmd_cp(int argc, char** argv) {
     // get inode to copy
     int original_inode_id = path_to_inode(argv[1]); 
-    if(original_inode_id < 0) return -original_inode_id;
+    if(original_inode_id < 0) return ERR_NO_SOURCE;
     struct inode original_node = get_inode(original_inode_id);
 
     // separate destination path and filename
@@ -34,12 +35,12 @@ int cmd_cp(int argc, char** argv) {
     int target_dir_id = path_to_parent_inode(argv[2], &file_name);
     
     if (target_dir_id < 0) {
-        if (file_name) free(file_name);
+        free(file_name);
         return -target_dir_id;
     }
     
     if (!file_name || file_name[0] == '\0') {
-        if (file_name) free(file_name);
+        free(file_name);
         return ERR_FILE_NAME_EMPTY;
     }
     
@@ -73,7 +74,6 @@ int cmd_cp(int argc, char** argv) {
 
     // copy the data to new inode
     int cluster_count = (original_node.file_size + CLUSTER_SIZE - 1) / CLUSTER_SIZE;
-    printf("cluster count: %d", cluster_count);
     int offset;
     uint8_t* current_cluster_data = malloc(CLUSTER_SIZE);
     for (int cluster_index = 0; cluster_index < cluster_count; cluster_index++){ 
@@ -88,13 +88,11 @@ int cmd_cp(int argc, char** argv) {
         
         
         // read from original
-        printf("read from %d", original_clusters[cluster_index]);
         offset = original_clusters[cluster_index] * CLUSTER_SIZE + g_system_state.sb.data_start_address;
         fseek(g_system_state.file_ptr, offset, SEEK_SET);
         fread(current_cluster_data, bytes_to_read, 1, g_system_state.file_ptr); 
         
         // write to new one
-        printf("write to %d", new_clusters[cluster_index]);
         offset = new_clusters[cluster_index] * CLUSTER_SIZE + g_system_state.sb.data_start_address;
         fseek(g_system_state.file_ptr, offset, SEEK_SET);
         fwrite(current_cluster_data, bytes_to_read, 1, g_system_state.file_ptr);
@@ -113,23 +111,24 @@ int cmd_cp(int argc, char** argv) {
     free(file_name);
     return ERR_SUCCESS;
 }
+
 int cmd_mv(int argc, char** argv) { 
     char* from_file_name = NULL;
     int from_dir_id = path_to_parent_inode(argv[1], &from_file_name); 
     
     if (from_dir_id < 0) {
-        if (from_file_name) free(from_file_name);
-        return -from_dir_id;
+        free(from_file_name);
+        return ERR_NO_SOURCE;
     }
     
     if (!from_file_name || from_file_name[0] == '\0') {
-        if (from_file_name) free(from_file_name);
-        return ERR_FILE_NAME_EMPTY;
+        free(from_file_name);
+        return ERR_NO_SOURCE;
     }
     
     // Find the source file in its parent directory
     struct inode from_dir_inode = get_inode(from_dir_id);
-    int from_inode_id = find_item_in_dir(&from_dir_inode, from_file_name);
+    int from_inode_id = path_to_inode(argv[1]);
     
     if (from_inode_id < 0) {
         free(from_file_name);
@@ -137,25 +136,20 @@ int cmd_mv(int argc, char** argv) {
     }
     
     struct inode from_inode = get_inode(from_inode_id);
-    
-    if (!from_inode.is_file){
-        free(from_file_name);
-        return ERR_NOT_A_FILE;
-    }
-    
+     
     // Get destination directory and filename
     char* to_file_name = NULL;
     int to_dir_id = path_to_parent_inode(argv[2], &to_file_name);
     
     if (to_dir_id < 0) {
         free(from_file_name);
-        if (to_file_name) free(to_file_name);
+        free(to_file_name);
         return -to_dir_id;
     }
     
     if (!to_file_name || to_file_name[0] == '\0') {
         free(from_file_name);
-        if (to_file_name) free(to_file_name);
+        free(to_file_name);
         return ERR_FILE_NAME_EMPTY;
     }
     
@@ -192,12 +186,12 @@ int cmd_rm(int argc, char** argv) {
     int parent_dir_id = path_to_parent_inode(argv[1], &file_name);
     
     if (parent_dir_id < 0) {
-        if (file_name) free(file_name);
+        free(file_name);
         return -parent_dir_id;
     }
     
     if (!file_name || file_name[0] == '\0') {
-        if (file_name) free(file_name);
+        free(file_name);
         return ERR_FILE_NAME_EMPTY;
     }
     
@@ -213,12 +207,12 @@ int cmd_mkdir(int argc, char** argv) {
     int parent_dir_id = path_to_parent_inode(argv[1], &dir_name);
     
     if (parent_dir_id < 0) {
-        if (dir_name) free(dir_name);
+        free(dir_name);
         return -parent_dir_id;
     }
     
     if (!dir_name || dir_name[0] == '\0') {
-        if (dir_name) free(dir_name);
+        free(dir_name);
         return ERR_FILE_NAME_EMPTY;
     }
     
@@ -474,8 +468,10 @@ int cmd_outcp(int argc, char** argv) {
 
     return ERR_SUCCESS;
 }
+
 int cmd_load(int argc, char** argv) { printf("TODO: Load function called\n"); return ERR_SUCCESS; }
 int cmd_statfs(int argc, char** argv) { printf("TODO: Status filesystem function called\n"); return ERR_SUCCESS; }
+
 int ln(int argc, char** argv) {
     // get inode to link
     int original_inode_id = path_to_inode(argv[1]);

@@ -20,9 +20,17 @@ void repl(){
     char* input = malloc(sizeof(char) * INPUT_BUFFER_SIZE);
     // char* argv;
 
+    int last_error_num = 0;
+    int last_command_executed = 0;
+
     while (1) {
 
-        printf("dulafs:%s> ", g_system_state.working_dir);  // Show current directory in prompt
+        if (last_command_executed) {
+            if (last_error_num == 0) { printf("[\033[0;32mok\033[0m] "); }
+            else { printf("[\033[0;31m%d\033[0m] ", last_error_num); }
+        }
+        last_command_executed = 0;
+        printf("\033[38;5;117mdula\033[0m\033[38;5;210mfs\033[0m:\033[38;5;227m%s\033[0m> ", g_system_state.working_dir);  // Show current directory in prompt (working dir is soft yellow)
         fflush(stdout); 
 
         // Safer fgets with error checking
@@ -76,16 +84,15 @@ void repl(){
                     break;
                 }
                 // execute the command
-                int ret_val = commands[i].function(token_count, args);
-                if (ret_val == ERR_SUCCESS){
-                    // Command succeeded, no message needed
-                } else {
+                last_error_num = commands[i].function(token_count, args);
+                last_command_executed = 1;
+                if (last_error_num != ERR_SUCCESS) {
                     // Command failed, print error message
-                    const char* error_msg = get_error_message((ErrorCode)ret_val);
+                    const char* error_msg = get_error_message((ErrorCode)last_error_num);
                     if (error_msg) {
                         fprintf(stderr, "Error: %s\n", error_msg);
                     } else {
-                        fprintf(stderr, "Command returned with error code: %d\n", ret_val);
+                        fprintf(stderr, "Command returned with error code: %d\n", last_error_num);
                     }
                 }
                 break;

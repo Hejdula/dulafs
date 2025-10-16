@@ -8,6 +8,7 @@
 // Error codes
 typedef enum {
     ERR_SUCCESS = 0,
+    ERR_NO_SOURCE,
     ERR_INVALID_SIZE,
     ERR_PATH_NOT_EXIST,
     ERR_NOT_A_DIRECTORY,

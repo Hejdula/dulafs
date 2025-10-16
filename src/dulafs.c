@@ -20,9 +20,10 @@ struct SystemState g_system_state = {
 const char* get_error_message(ErrorCode code) {
     switch (code) {
         case ERR_SUCCESS: return NULL;
+        case ERR_NO_SOURCE: return "Source file not found";
         case ERR_INVALID_SIZE: return "Invalid size argument";
         case ERR_PATH_NOT_EXIST: return "Path does not exist";
-        case ERR_NOT_A_DIRECTORY: return "Not a directory";
+        case ERR_NOT_A_DIRECTORY: return "Path not found, can not traverse file like a directory";
         case ERR_NOT_A_FILE: return "Not a file";
         case ERR_FILE_NAME_EMPTY: return "File name cannot be empty";
         case ERR_FILE_EXISTS: return "File or directory with the same name already exists";
@@ -36,7 +37,7 @@ const char* get_error_message(ErrorCode code) {
         case ERR_CANNOT_REMOVE_DOT: return "Cannot remove '.' or '..' from directory";
         case ERR_EXTERNAL_FILE_NOT_FOUND: return "External file not found";
         case ERR_CANNOT_HARDLINK_DIR: return "Cannot hard link a directory";
-        case ERR_INVALID_ARGC: return "Invalid number of arguments";
+        case ERR_INVALID_ARGC: return "Invalid number of arguments"; 
         default: return "Unknown error";
     }
 }
@@ -231,29 +232,6 @@ char* get_final_token(char* path) {
     
     char* last_slash = strrchr(path, '/');
     return last_slash ? last_slash + 1 : path;
-}
-
-// Find an item in a directory by name, returns inode ID or negative error code
-int find_item_in_dir(struct inode* dir_inode, char* item_name) {
-    if (dir_inode->is_file) {
-        return -ERR_NOT_A_DIRECTORY;
-    }
-    
-    struct directory_item* dir_content = get_directory_items(dir_inode);
-    if (!dir_content) return -ERR_MEMORY_ALLOCATION;
-    
-    int record_count = dir_inode->file_size / sizeof(struct directory_item);
-    int found_inode = -ERR_FILE_NOT_FOUND;
-    
-    for (int i = 0; i < record_count; i++) {
-        if (!strcmp(dir_content[i].item_name, item_name)) {
-            found_inode = dir_content[i].inode;
-            break;
-        }
-    }
-    
-    free(dir_content);
-    return found_inode;
 }
 
 // Traverse path to parent directory and return parent inode ID
@@ -562,35 +540,8 @@ uint8_t* get_node_data(struct inode* inode){
     return data;
 };
 
-// Returns a malloc'd array of directory items
 struct directory_item* get_directory_items(struct inode* dir_inode) {
-
-    struct directory_item* cluster_data = malloc(CLUSTER_SIZE);
-    if (!cluster_data) { return NULL; }
-
-    int valid_record_count = dir_inode->file_size / sizeof(struct directory_item);
-    struct directory_item* dir_records = malloc(valid_record_count * sizeof(struct directory_item)); 
-    if (!dir_records) { free(cluster_data); return NULL; }
-
-    fseek(g_system_state.file_ptr, dir_inode->direct[0] * CLUSTER_SIZE + g_system_state.sb.data_start_address, SEEK_SET);
-    fread(cluster_data, CLUSTER_SIZE, 1, g_system_state.file_ptr);
-
-    int max_record_count = CLUSTER_SIZE / sizeof(struct directory_item);
-    int record_count = 0;
-    for (int i = 0; i < max_record_count && record_count < valid_record_count; i++) {
-        if (cluster_data[i].item_name[0]) {
-            dir_records[record_count] = cluster_data[i];
-            record_count++;
-        }
-    }
-
-    if(record_count != valid_record_count){
-        printf("Error in directory inode size compared to valid records, this should not happen\n");
-        printf("Expected %d records, found %d\n", valid_record_count, record_count);
-    }
-
-    free(cluster_data);
-    return dir_records;
+    return (struct directory_item*)get_node_data(dir_inode);
 }
 
 
@@ -622,6 +573,7 @@ int delete_item(struct inode* inode, char* item_name){
             item_found = 1;
             struct inode inode_to_delete = get_inode(dir_content[i].inode);
 
+            // do not delete dir if not empty
             if (inode_to_delete.file_size != 32 && !inode_to_delete.is_file) {
                 free(dir_content);
                 return ERR_DIR_NOT_EMPTY;

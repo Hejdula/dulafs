@@ -525,16 +525,7 @@ int delete_item(struct inode* inode, char* item_name){
             fseek(g_system_state.file_ptr, deleted_offset, SEEK_SET);
             fwrite(&last_item, sizeof(struct directory_item), 1, g_system_state.file_ptr);
             
-            // Clear the old last position (only if it's different from deleted position)
-            if (i != record_count - 1) {
-                struct directory_item empty_item = {0};
-                fseek(g_system_state.file_ptr, last_offset, SEEK_SET);
-                fwrite(&empty_item, sizeof(struct directory_item), 1, g_system_state.file_ptr);
-            }
             
-            inode->file_size -= sizeof(struct directory_item);
-            write_inode(inode);
-
             inode_to_delete.references -= 1;
             if(inode_to_delete.references == 0){
                 clear_inode(&inode_to_delete);
@@ -542,13 +533,18 @@ int delete_item(struct inode* inode, char* item_name){
             
             break;
         }
-    }
-
+    }    
     free(dir_content);
+    
     if(!item_found){
         fprintf(stderr, "Could not find %s\n", item_name);
         return EXIT_FAILURE;
     }
+
+    // Decrease directory size
+    inode->file_size -= sizeof(struct directory_item);
+    write_inode(inode);
+
     return EXIT_SUCCESS;
 }
 

@@ -31,10 +31,21 @@ int cmd_cp(int argc, char** argv) {
 
     // separate name of the file from path using helper function
     char* file_name = get_final_token(argv[2]);
+    
+    if (!file_name || file_name[0] == '\0') {
+        fprintf(stderr, "File name cannot be empty\n");
+        return EXIT_FAILURE;
+    }
  
     int target_dir_id = path_to_dir_inode(argv[2]);
     if (target_dir_id == -1) return EXIT_FAILURE;
     struct inode target_dir = get_inode(target_dir_id);
+
+    // check if file already exists
+    if (contains_file(&target_dir, file_name)){
+        fprintf(stderr, "Directory or file \"%s\"with the same name already exists\n", argv[2]);
+        return EXIT_FAILURE;
+    }
 
     int new_inode_id = assign_empty_inode();
     if(new_inode_id == -1) return EXIT_FAILURE;
@@ -95,6 +106,11 @@ int cmd_mv(int argc, char** argv) {
     char* to_file_name = get_final_token(argv[2]);
     char* from_file_name = get_final_token(argv[1]);
     
+    if (!to_file_name || to_file_name[0] == '\0') {
+        fprintf(stderr, "File name cannot be empty\n");
+        return EXIT_FAILURE;
+    }
+    
     // source directory
     int from_dir_id = path_to_dir_inode(argv[1]); 
     if (from_dir_id == -1){ return EXIT_FAILURE; }
@@ -113,8 +129,9 @@ int cmd_mv(int argc, char** argv) {
         printf("%s is not a file\n", argv[1]);
         return EXIT_FAILURE;
     }
+
     if (contains_file(&to_dir_inode, to_file_name)){
-        printf("File %s already exists\n", argv[2]);
+        fprintf(stderr, "Directory or file \"%s\"with the same name already exists\n", argv[2]);
         return EXIT_FAILURE;
     }
 
@@ -145,11 +162,23 @@ int cmd_mkdir(int argc, char** argv) {
     
     // get parent directory and name of new one from args
     char* dir_name = get_final_token(argv[1]);
+    
+    if (!dir_name || dir_name[0] == '\0') {
+        fprintf(stderr, "Directory name cannot be empty\n");
+        return EXIT_FAILURE;
+    }
+    
     int paretn_dir_id = path_to_dir_inode(argv[1]);
     struct inode parent_inode = get_inode(paretn_dir_id);
     if (paretn_dir_id == -1) return EXIT_FAILURE;
     if (parent_inode.is_file) {
-        printf("Path does not exist");
+        printf("Path does not exist\n");
+        return EXIT_FAILURE;
+    }
+
+    // check if the file name already is there
+    if (contains_file(&parent_inode, dir_name)){
+        fprintf(stderr, "Directory or file \"%s\" with the same name already exists\n", argv[1]);
         return EXIT_FAILURE;
     }
 
@@ -198,7 +227,22 @@ int cmd_ls(int argc, char** argv) {
     if (!dir_content) return EXIT_FAILURE;
     int record_count = curr_inode.file_size / sizeof(struct directory_item);
     for (int i = 0; i < record_count; i++){
-        printf("%s : %d\n", dir_content[i].item_name, dir_content[i].inode);
+        struct inode item_inode = get_inode(dir_content[i].inode);
+        if (item_inode.is_file) {
+            // White/default color for files
+            printf("%-12s | inode: %3d | size: %6d bytes | refs: %d\n", 
+                   dir_content[i].item_name, 
+                   dir_content[i].inode,
+                   item_inode.file_size,
+                   item_inode.references);
+        } else {
+            // Blue color for directories
+            printf("\033[34m%-12s\033[0m | inode: %3d | size: %6d bytes | refs: %d\n", 
+                   dir_content[i].item_name, 
+                   dir_content[i].inode,
+                   item_inode.file_size,
+                   item_inode.references);
+        }
     }
     free(dir_content);
     return EXIT_SUCCESS;
@@ -264,6 +308,15 @@ int cmd_incp(int argc, char** argv) {
         return EXIT_FAILURE;
     }
     
+    // separate name of the file from path using helper function
+    char* file_name = get_final_token(argv[2]);
+    
+    if (!file_name || file_name[0] == '\0') {
+        fprintf(stderr, "File name cannot be empty\n");
+        fclose(fptr);
+        return EXIT_FAILURE;
+    }
+    
     fseek(fptr, 0, SEEK_END);
     int file_size = ftell(fptr);
     
@@ -276,9 +329,6 @@ int cmd_incp(int argc, char** argv) {
     inode.is_file = 1;
     inode.file_size = file_size;
     write_inode(&inode);
-
-    // separate name of the file from path using helper function
-    char* file_name = get_final_token(argv[2]);
 
     // get node_id of the directory
     int target_dir_id = path_to_dir_inode(argv[2]);

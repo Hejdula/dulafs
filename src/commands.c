@@ -29,25 +29,34 @@ int cmd_cp(int argc, char** argv) {
     if(original_inode_id < 0) return -original_inode_id;
     struct inode original_node = get_inode(original_inode_id);
 
-    // separate name of the file from path
-    char* file_name = get_final_token(argv[2]);
+    // separate destination path and filename
+    char* file_name = NULL;
+    int target_dir_id = path_to_parent_inode(argv[2], &file_name);
+    
+    if (target_dir_id < 0) {
+        if (file_name) free(file_name);
+        return -target_dir_id;
+    }
     
     if (!file_name || file_name[0] == '\0') {
+        if (file_name) free(file_name);
         return ERR_FILE_NAME_EMPTY;
     }
- 
-    int target_dir_id = path_to_dir_inode(argv[2]);
-    if (target_dir_id < 0) return -target_dir_id;
+    
     struct inode target_dir = get_inode(target_dir_id);
 
     // check if file already exists
     if (contains_file(&target_dir, file_name)){
+        free(file_name);
         return ERR_FILE_EXISTS;
     }
 
     // create new inode
     int new_inode_id = assign_empty_inode();
-    if(new_inode_id == -1) return ERR_INODE_FULL;
+    if(new_inode_id == -1) {
+        free(file_name);
+        return ERR_INODE_FULL;
+    }
     struct inode new_inode = {0};
     new_inode.id = new_inode_id;
     new_inode.file_size = original_node.file_size;
@@ -58,6 +67,7 @@ int cmd_cp(int argc, char** argv) {
     int* original_clusters = get_node_clusters(&original_node);
     if (original_clusters == NULL) {
         clear_inode(&new_inode);
+        free(file_name);
         return ERR_MEMORY_ALLOCATION;
     }
 
@@ -100,35 +110,60 @@ int cmd_cp(int argc, char** argv) {
     add_record_to_dir(item, &target_dir); 
     fflush(g_system_state.file_ptr);
 
+    free(file_name);
     return ERR_SUCCESS;
 }
 int cmd_mv(int argc, char** argv) { 
-    char* to_file_name = get_final_token(argv[2]);
-    char* from_file_name = get_final_token(argv[1]);
+    char* from_file_name = NULL;
+    int from_dir_id = path_to_parent_inode(argv[1], &from_file_name); 
     
-    if (!to_file_name || to_file_name[0] == '\0') {
+    if (from_dir_id < 0) {
+        if (from_file_name) free(from_file_name);
+        return -from_dir_id;
+    }
+    
+    if (!from_file_name || from_file_name[0] == '\0') {
+        if (from_file_name) free(from_file_name);
         return ERR_FILE_NAME_EMPTY;
     }
     
-    // source directory
-    int from_dir_id = path_to_dir_inode(argv[1]); 
-    if (from_dir_id < 0){ return -from_dir_id; }
+    // Find the source file in its parent directory
+    struct inode from_dir_inode = get_inode(from_dir_id);
+    int from_inode_id = find_item_in_dir(&from_dir_inode, from_file_name);
     
-    // destination directory
-    int to_dir_id = path_to_dir_inode(argv[2]);
-    if (to_dir_id < 0){ return -to_dir_id; }
-    struct inode to_dir_inode = get_inode(to_dir_id); 
+    if (from_inode_id < 0) {
+        free(from_file_name);
+        return -from_inode_id;
+    }
     
-    // source file
-    int from_inode_id = path_to_inode(argv[1]);
-    if (from_inode_id < 0){ return -from_inode_id;}
     struct inode from_inode = get_inode(from_inode_id);
-
+    
     if (!from_inode.is_file){
+        free(from_file_name);
         return ERR_NOT_A_FILE;
     }
+    
+    // Get destination directory and filename
+    char* to_file_name = NULL;
+    int to_dir_id = path_to_parent_inode(argv[2], &to_file_name);
+    
+    if (to_dir_id < 0) {
+        free(from_file_name);
+        if (to_file_name) free(to_file_name);
+        return -to_dir_id;
+    }
+    
+    if (!to_file_name || to_file_name[0] == '\0') {
+        free(from_file_name);
+        if (to_file_name) free(to_file_name);
+        return ERR_FILE_NAME_EMPTY;
+    }
+    
+    struct inode to_dir_inode = get_inode(to_dir_id); 
 
     if (contains_file(&to_dir_inode, to_file_name)){
+        free(from_file_name);
+        free(to_file_name);
         return ERR_FILE_EXISTS;
     }
 
@@ -137,55 +172,70 @@ int cmd_mv(int argc, char** argv) {
     strlcpy(new_record.item_name, to_file_name, sizeof(char[DIR_NAME_SIZE]));
     int ret = add_record_to_dir(new_record, &to_dir_inode);
     if (ret) { 
+        free(from_file_name);
+        free(to_file_name);
         return ret;
     }
     
-    // the source dir inode needs to be loaded now because the destination dir may be same as source dir,
+    // Reload the source dir inode because destination dir may be same as source dir,
     // changing it in file but not the struct in code
-    struct inode from_dir_inode = get_inode(from_dir_id);
+    from_dir_inode = get_inode(from_dir_id);
     delete_item(&from_dir_inode, from_file_name);
 
+    free(from_file_name);
+    free(to_file_name);
     return ERR_SUCCESS;
 }
 
 int cmd_rm(int argc, char** argv) {
-    // separate name of the file from path
-    char* file_name = get_final_token(argv[1]); 
+    char* file_name = NULL;
+    int parent_dir_id = path_to_parent_inode(argv[1], &file_name);
+    
+    if (parent_dir_id < 0) {
+        if (file_name) free(file_name);
+        return -parent_dir_id;
+    }
+    
     if (!file_name || file_name[0] == '\0') {
+        if (file_name) free(file_name);
         return ERR_FILE_NAME_EMPTY;
     }
- 
-    // get target directory
-    int target_dir_id = path_to_dir_inode(argv[1]);
-    if (target_dir_id < 0) return -target_dir_id;
-    struct inode target_dir = get_inode(target_dir_id);
-
-    return delete_item(&target_dir, file_name);
+    
+    struct inode parent_dir = get_inode(parent_dir_id);
+    int result = delete_item(&parent_dir, file_name);
+    
+    free(file_name);
+    return result;
 }
 
 int cmd_mkdir(int argc, char** argv) {
+    char* dir_name = NULL;
+    int parent_dir_id = path_to_parent_inode(argv[1], &dir_name);
     
-    // get parent directory and name of new one from args
-    char* dir_name = get_final_token(argv[1]);
+    if (parent_dir_id < 0) {
+        if (dir_name) free(dir_name);
+        return -parent_dir_id;
+    }
     
     if (!dir_name || dir_name[0] == '\0') {
+        if (dir_name) free(dir_name);
         return ERR_FILE_NAME_EMPTY;
     }
     
-    int paretn_dir_id = path_to_dir_inode(argv[1]);
-    if (paretn_dir_id < 0) return -paretn_dir_id;
-    struct inode parent_inode = get_inode(paretn_dir_id);
+    struct inode parent_inode = get_inode(parent_dir_id);
     if (parent_inode.is_file) {
+        free(dir_name);
         return ERR_PATH_NOT_EXIST;
     }
 
-    // check if the file name already is there
+    // check if the file name already exists
     if (contains_file(&parent_inode, dir_name)){
+        free(dir_name);
         return ERR_FILE_EXISTS;
     }
 
     // create new directory node
-    int new_node_id = create_dir_node(paretn_dir_id); 
+    int new_node_id = create_dir_node(parent_dir_id); 
 
     // create new record to add
     struct directory_item dir_record = {0};
@@ -193,7 +243,8 @@ int cmd_mkdir(int argc, char** argv) {
     strlcpy(dir_record.item_name, dir_name, sizeof(dir_record.item_name));
 
     add_record_to_dir(dir_record, &parent_inode);
-
+    
+    free(dir_name);
     return ERR_SUCCESS;
 }
 
@@ -203,12 +254,19 @@ int cmd_rmdir(int argc, char** argv) {
         return ERR_CANNOT_REMOVE_DOT;
     }
 
-    // separate name of the dir from path using helper function
-    char* dir_name = get_final_token(argv[1]);
+    char* dir_name = NULL;
+    int parent_dir_id = path_to_parent_inode(argv[1], &dir_name);
     
-    int target_node_id = path_to_dir_inode(argv[1]);
-    struct inode target_inode = get_inode(target_node_id);
-    return delete_item(&target_inode, dir_name);
+    if (parent_dir_id < 0) {
+        if (dir_name) free(dir_name);
+        return -parent_dir_id;
+    }
+    
+    struct inode parent_inode = get_inode(parent_dir_id);
+    int result = delete_item(&parent_inode, dir_name);
+    
+    free(dir_name);
+    return result;
 }
     
 int cmd_ls(int argc, char** argv) {
@@ -321,11 +379,19 @@ int cmd_incp(int argc, char** argv) {
         return ERR_EXTERNAL_FILE_NOT_FOUND;
     }
     
-    // separate name of the file from path using helper function
-    char* file_name = get_final_token(argv[2]);
+    // separate destination path and filename
+    char* file_name = NULL;
+    int target_dir_id = path_to_parent_inode(argv[2], &file_name);
+    
+    if (target_dir_id < 0) {
+        fclose(fptr);
+        if (file_name) free(file_name);
+        return -target_dir_id;
+    }
     
     if (!file_name || file_name[0] == '\0') {
         fclose(fptr);
+        if (file_name) free(file_name);
         return ERR_FILE_NAME_EMPTY;
     }
     
@@ -342,14 +408,7 @@ int cmd_incp(int argc, char** argv) {
     inode.file_size = file_size;
     write_inode(&inode);
 
-    
-    // get node_id of the directory
-    int target_dir_id = path_to_dir_inode(argv[2]);
-    if(target_dir_id < 0){
-        clear_inode(&inode);
-        fclose(fptr);
-        return -target_dir_id;
-    }    // add the file into directory
+    // add the file into directory
     struct inode target_dir = get_inode(target_dir_id);
     struct directory_item item = {0};
     item.inode = inode.id;
@@ -389,6 +448,7 @@ int cmd_incp(int argc, char** argv) {
 
     fclose(fptr);
     free(clusters);
+    free(file_name);
     return ERR_SUCCESS;
 }
 
@@ -425,19 +485,25 @@ int ln(int argc, char** argv) {
         return ERR_CANNOT_HARDLINK_DIR;
     }
 
-    // separate name of the file from path
-    char* file_name = get_final_token(argv[2]); 
+    // separate destination path and filename
+    char* file_name = NULL;
+    int target_dir_id = path_to_parent_inode(argv[2], &file_name);
+    
+    if (target_dir_id < 0) {
+        if (file_name) free(file_name);
+        return -target_dir_id;
+    }
+    
     if (!file_name || file_name[0] == '\0') {
+        if (file_name) free(file_name);
         return ERR_FILE_NAME_EMPTY;
     }
- 
-    // get target directory
-    int target_dir_id = path_to_dir_inode(argv[2]);
-    if (target_dir_id < 0) return -target_dir_id;
+    
     struct inode target_dir = get_inode(target_dir_id);
 
     // check if file already exists
     if (contains_file(&target_dir, file_name)){
+        free(file_name);
         return ERR_FILE_EXISTS;
     }
 
@@ -447,6 +513,7 @@ int ln(int argc, char** argv) {
     strlcpy(record.item_name, file_name, DIR_NAME_SIZE);
     add_record_to_dir(record, &target_dir);
 
+    free(file_name);
     return ERR_SUCCESS;
 };
 

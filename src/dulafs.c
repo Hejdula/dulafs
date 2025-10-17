@@ -22,10 +22,9 @@ const char* get_error_message(ErrorCode code) {
         case ERR_SUCCESS: return NULL;
         case ERR_NO_SOURCE: return "Source file not found";
         case ERR_INVALID_SIZE: return "Invalid size argument";
-        case ERR_PATH_NOT_EXIST: return "Path does not exist";
+        case ERR_PATH_NOT_EXIST: return "Path not found";
         case ERR_NOT_A_DIRECTORY: return "Not a directory";
         case ERR_NOT_A_FILE: return "Not a file";
-        case ERR_FILE_NAME_EMPTY: return "File name cannot be empty";
         case ERR_FILE_EXISTS: return "File or directory with the same name already exists";
         case ERR_INODE_FULL: return "No free inodes available";
         case ERR_CLUSTER_FULL: return "No free clusters available";

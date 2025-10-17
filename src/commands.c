@@ -32,11 +32,8 @@ int cmd_cp(int argc, char** argv) {
 
     // separate destination path and filename
     char* file_name = NULL;
-    int target_dir_id = get_dir_id(argv[2], &file_name);
-    
+    int target_dir_id = get_dir_id(argv[2], &file_name); 
     if (target_dir_id < 0) { return -target_dir_id; }
-    
-    if (!file_name || file_name[0] == '\0') { return ERR_FILE_NAME_EMPTY; }
     
     struct inode target_dir = get_inode(target_dir_id);
 
@@ -116,14 +113,10 @@ int cmd_mv(int argc, char** argv) {
      
     // Get destination directory and filename
     char* to_file_name = NULL;
-    int to_dir_id = get_dir_id(argv[2], &to_file_name);
-    
+    int to_dir_id = get_dir_id(argv[2], &to_file_name); 
     if (to_dir_id < 0) { return -to_dir_id; }
-    
-    if (!to_file_name || to_file_name[0] == '\0') { return ERR_FILE_NAME_EMPTY; }
-    
+     
     struct inode to_dir_inode = get_inode(to_dir_id); 
-
     if (contains_file(&to_dir_inode, to_file_name)){ return ERR_FILE_EXISTS; }
 
     struct directory_item new_record = {0};
@@ -145,10 +138,10 @@ int cmd_rm(int argc, char** argv) {
     char* file_name = NULL;
     int parent_dir_id = get_dir_id(argv[1], &file_name);
     if (parent_dir_id < 0){ return -parent_dir_id; }
-    if (!file_name || file_name[0] == '\0') { return ERR_NO_SOURCE; }
+    if (!file_name || file_name[0] == '\0') { return ERR_FILE_NOT_FOUND; }
 
     int source_inode_id = path_to_inode(argv[1]);
-    if (source_inode_id < 0 ){ return ERR_NO_SOURCE; }
+    if (source_inode_id < 0 ){ return ERR_FILE_NOT_FOUND; }
     struct inode source_inode = get_inode(source_inode_id);
     if (!source_inode.is_file){ return ERR_NOT_A_FILE; }
     
@@ -160,11 +153,8 @@ int cmd_rm(int argc, char** argv) {
 
 int cmd_mkdir(int argc, char** argv) {
     char* dir_name = NULL;
-    int parent_dir_id = get_dir_id(argv[1], &dir_name);
-    
+    int parent_dir_id = get_dir_id(argv[1], &dir_name); 
     if (parent_dir_id < 0) { return -parent_dir_id; }
-    
-    if (!dir_name || dir_name[0] == '\0') { return ERR_FILE_NAME_EMPTY; }
     
     struct inode parent_inode = get_inode(parent_dir_id);
     if (parent_inode.is_file) { return ERR_PATH_NOT_EXIST; }
@@ -189,7 +179,7 @@ int cmd_rmdir(int argc, char** argv) {
 
     char* dir_name = NULL;
     int parent_dir_id = get_dir_id(argv[1], &dir_name);
-    if (!strcmp(dir_name, ".") && !strcmp(dir_name, "..")){ return ERR_CANNOT_REMOVE_DOT; }
+    if (!strcmp(dir_name, ".") || !strcmp(dir_name, "..")){ return ERR_CANNOT_REMOVE_DOT; }
     if (parent_dir_id < 0) { return -parent_dir_id; }
     
     struct inode parent_inode = get_inode(parent_dir_id);
@@ -273,11 +263,9 @@ int cmd_pwd(int argc, char** argv) {
 
 int cmd_info(int argc, char** argv) {
     char* name = get_final_token(argv[1]);
-    if (!name || name[0] == '\0') {
-        return ERR_FILE_NAME_EMPTY;
-    }
+    if (!name || name[0] == '\0') { return ERR_PATH_NOT_EXIST; }
     int inode_id = path_to_inode(argv[1]);
-    if (inode_id < 0){ return -inode_id;}
+    if (inode_id < 0){ return -inode_id; }
     struct inode inode = get_inode(inode_id);
     int cluster_count = (inode.file_size + CLUSTER_SIZE -1) / CLUSTER_SIZE;
     int* clusters = get_node_clusters(&inode);
@@ -310,17 +298,8 @@ int cmd_incp(int argc, char** argv) {
     
     // separate destination path and filename
     char* file_name = NULL;
-    int target_dir_id = get_dir_id(argv[2], &file_name);
-    
-    if (target_dir_id < 0) {
-        fclose(fptr);
-        return -target_dir_id;
-    }
-    
-    if (!file_name || file_name[0] == '\0') {
-        fclose(fptr);
-        return ERR_FILE_NAME_EMPTY;
-    }
+    int target_dir_id = get_dir_id(argv[2], &file_name); 
+    if (target_dir_id < 0) { fclose(fptr); return -target_dir_id; } 
     
     fseek(fptr, 0, SEEK_END);
     int file_size = ftell(fptr);
@@ -416,11 +395,7 @@ int ln(int argc, char** argv) {
     // separate destination path and filename
     char* file_name = NULL;
     int target_dir_id = get_dir_id(argv[2], &file_name);
-    
     if (target_dir_id < 0) { return -target_dir_id; }
-    
-    if (!file_name || file_name[0] == '\0') { return ERR_FILE_NAME_EMPTY; }
-    
     struct inode target_dir = get_inode(target_dir_id);
 
     // check if file already exists

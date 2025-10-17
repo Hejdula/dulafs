@@ -27,8 +27,9 @@ int cmd_format(int argc, char** argv) {
 int cmd_cp(int argc, char** argv) {
     // get inode to copy
     int original_inode_id = path_to_inode(argv[1]); 
-    if(original_inode_id < 0) return ERR_NO_SOURCE;
+    if (original_inode_id < 0) return ERR_NO_SOURCE;
     struct inode original_node = get_inode(original_inode_id);
+    if (!original_node.is_file) return ERR_NOT_A_FILE;
 
     // separate destination path and filename
     char* file_name = NULL;
@@ -263,7 +264,6 @@ int cmd_pwd(int argc, char** argv) {
 
 int cmd_info(int argc, char** argv) {
     char* name = get_final_token(argv[1]);
-    if (!name || name[0] == '\0') { return ERR_PATH_NOT_EXIST; }
     int inode_id = path_to_inode(argv[1]);
     if (inode_id < 0){ return -inode_id; }
     struct inode inode = get_inode(inode_id);

@@ -503,9 +503,7 @@ void clear_inode(struct inode* inode){
 }
 
 int delete_item(struct inode* inode, char* item_name){
-    if (inode->is_file){
-        return ERR_NOT_A_DIRECTORY;
-    }
+    if (inode->is_file){ return ERR_NOT_A_DIRECTORY; }
     struct directory_item* dir_content = get_directory_items(inode);
     int record_count = inode->file_size / sizeof(struct directory_item);
     int item_found = 0;
@@ -516,7 +514,7 @@ int delete_item(struct inode* inode, char* item_name){
             struct inode inode_to_delete = get_inode(dir_content[i].inode);
 
             // do not delete dir if not empty
-            if (inode_to_delete.file_size != 32 && !inode_to_delete.is_file) {
+            if (inode_to_delete.file_size != 32 && !inode_to_delete.is_file && inode_to_delete.references == 1) {
                 free(dir_content);
                 return ERR_DIR_NOT_EMPTY;
             }
@@ -534,11 +532,8 @@ int delete_item(struct inode* inode, char* item_name){
             
             
             inode_to_delete.references -= 1;
-            if(inode_to_delete.references <= 0){
-                clear_inode(&inode_to_delete);
-            } else {
-                write_inode(&inode_to_delete);
-            }
+            if (inode_to_delete.references <= 0){ clear_inode(&inode_to_delete); } 
+            else { write_inode(&inode_to_delete); }
             
             break;
         }

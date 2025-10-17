@@ -23,7 +23,7 @@ const char* get_error_message(ErrorCode code) {
         case ERR_NO_SOURCE: return "Source file not found";
         case ERR_INVALID_SIZE: return "Invalid size argument";
         case ERR_PATH_NOT_EXIST: return "Path does not exist";
-        case ERR_NOT_A_DIRECTORY: return "Path not found, can not traverse file like a directory";
+        case ERR_NOT_A_DIRECTORY: return "Not a directory";
         case ERR_NOT_A_FILE: return "Not a file";
         case ERR_FILE_NAME_EMPTY: return "File name cannot be empty";
         case ERR_FILE_EXISTS: return "File or directory with the same name already exists";
@@ -32,7 +32,6 @@ const char* get_error_message(ErrorCode code) {
         case ERR_DIR_NOT_EMPTY: return "Target directory is not empty";
         case ERR_FILE_NOT_FOUND: return "File not found";
         case ERR_MEMORY_ALLOCATION: return "Memory allocation failed";
-        case ERR_PATH_TOO_LONG: return "Path too long";
         case ERR_CANNOT_TRAVERSE: return "Cannot traverse file as directory";
         case ERR_CANNOT_REMOVE_DOT: return "Cannot remove '.' or '..' from directory";
         case ERR_EXTERNAL_FILE_NOT_FOUND: return "External file not found";
@@ -234,86 +233,30 @@ char* get_final_token(char* path) {
     return last_slash ? last_slash + 1 : path;
 }
 
-// Traverse path to parent directory and return parent inode ID
-// Returns negative error code on failure
-// If out_filename is not NULL, sets it to point to the final component of the path
-int path_to_parent_inode(char* path, char** out_filename) {
-    if (strlen(path) >= MAX_DIR_PATH) {
-        return -ERR_PATH_TOO_LONG;
-    }
-
-    int curr_node_id;
-    if (path[0] == '/') {
-        curr_node_id = ROOT_NODE;
-    } else {
-        curr_node_id = g_system_state.curr_node_id;
-    }
-
-    char path_copy[MAX_DIR_PATH];
-    strncpy(path_copy, path, MAX_DIR_PATH);
-    
-    // Find the last slash to separate parent path from filename
-    char* last_slash = strrchr(path_copy, '/');
-    char* filename;
-    
-    if (last_slash) {
-        *last_slash = '\0';
-        filename = last_slash + 1;
-        
-        // If path was "/file", parent is root
-        if (path_copy[0] == '\0') {
-            if (out_filename) *out_filename = strdup(filename);
-            return ROOT_NODE;
-        }
-    } else {
-        // No slash, so the file is in current directory
-        filename = path_copy;
-        if (out_filename) *out_filename = strdup(filename);
-        return curr_node_id;
-    }
-    
-    // Traverse to parent directory
-    for (char* token = strtok(path_copy, "/"); token != NULL; token = strtok(NULL, "/")) {
-        struct inode inode = get_inode(curr_node_id);
-        if (inode.is_file) {
-            return -ERR_CANNOT_TRAVERSE;
-        }
-        
-        struct directory_item* node_data = get_directory_items(&inode);
-        int record_count = inode.file_size / sizeof(struct directory_item);
-        int node_found = 0;
-        
-        for (int i = 0; i < record_count; i++) {
-            if (!strcmp(token, node_data[i].item_name)) {
-                curr_node_id = node_data[i].inode;
-                node_found = 1;
-                break;
-            }
-        }
-        
-        free(node_data);
-        
-        if (!node_found) {
-            return -ERR_PATH_NOT_EXIST;
-        }
-    }
-    
-    if (out_filename) {
-        *out_filename = strdup(filename);
-    }
-    
-    return curr_node_id;
-}
-
-int path_to_dir_inode(char* path){
+/**
+ * @brief Get the dir id object returns id of directory which contains the path target,
+ * also set the target_name to point into path to the target name
+ * 
+ * @param path 
+ * @param target_name 
+ * @return int 
+ */
+int get_dir_id(char* path, char** target_name){
     size_t length = strlen(path);
-    char* path_copy = malloc(length);
-    strlcpy(path_copy, path, length);
+    // invalid path if ends with '/'
+    if (length > 1 && path[length] == '/'){ return -ERR_PATH_NOT_EXIST; }
+
+    char* path_copy = malloc(length + 1);
+    if(!path_copy){ return -ERR_MEMORY_ALLOCATION; }
+    strncpy(path_copy, path, length + 1);
+
     char* last_slash = strrchr(path_copy,'/');
-    if(last_slash){
+    if (last_slash){
         *last_slash = '\0';
+        *target_name = last_slash - path_copy + path + 1;
     } else {
         free(path_copy);
+        *target_name = path;
         return g_system_state.curr_node_id;
     }
     int retval = path_to_inode(path_copy);
@@ -322,9 +265,9 @@ int path_to_dir_inode(char* path){
 }
 
 int path_to_inode(char* path){
-    if (strlen(path) >= MAX_DIR_PATH){
-        return -ERR_PATH_TOO_LONG;
-    }
+    // invalid path if ends with '/'
+    size_t length = strlen(path);
+    if (length > 1 && path[length] == '/'){ return -ERR_PATH_NOT_EXIST; }
 
     int curr_node_id;
     if (path[0] == '/') curr_node_id = ROOT_NODE;

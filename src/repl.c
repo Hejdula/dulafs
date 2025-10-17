@@ -30,7 +30,7 @@ void repl(){
             else { printf("[\033[0;31m%d\033[0m] ", last_error_num); }
         }
         last_command_executed = 0;
-        printf("\033[38;5;117mdula\033[0m\033[38;5;210mfs\033[0m:\033[38;5;227m%s\033[0m> ", g_system_state.working_dir);  // Show current directory in prompt (working dir is soft yellow)
+        printf("\033[38;5;117mdulafs\033[0m:\033[38;5;227m%s\033[0m> ", g_system_state.working_dir);  // Show current directory in prompt (working dir is soft yellow)
         fflush(stdout); 
 
         // Safer fgets with error checking

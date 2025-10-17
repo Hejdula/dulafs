@@ -20,7 +20,6 @@ typedef enum {
     ERR_DIR_NOT_EMPTY,
     ERR_FILE_NOT_FOUND,
     ERR_MEMORY_ALLOCATION,
-    ERR_PATH_TOO_LONG,
     ERR_CANNOT_TRAVERSE,
     ERR_CANNOT_REMOVE_DOT,
     ERR_EXTERNAL_FILE_NOT_FOUND,
@@ -103,9 +102,8 @@ int* assign_node_clusters(struct inode* inode);
 int format(int size);
 char* inode_to_path(int inode_id);
 int path_to_inode(char* path);
-int path_to_parent_inode(char* path, char** out_filename);
 char* get_final_token(char* path);
-int path_to_dir_inode(char* path);
+int get_dir_id(char* path, char** target_name);
 int delete_item(struct inode* inode, char* item_name);
 int find_item_in_dir(struct inode* dir_inode, char* item_name);
 int test();

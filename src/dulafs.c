@@ -273,13 +273,14 @@ int path_to_inode(char* path){
     else curr_node_id = g_system_state.curr_node_id ;
 
 
-    char path_copy[MAX_DIR_PATH];
-    strncpy(path_copy, path, MAX_DIR_PATH);
+    char* path_copy = strdup(path);
+    
     // process tokens by one of the path
     for (char* token = strtok(path_copy, "/"); token != NULL; token = strtok(NULL, "/")){
         // if(!strcmp(token, ".")){ continue; }
         struct inode inode = get_inode(curr_node_id);
         if (inode.is_file){
+            free(path_copy);
             return -ERR_CANNOT_TRAVERSE;
         }
         struct directory_item* node_data = get_directory_items(&inode);
@@ -294,12 +295,14 @@ int path_to_inode(char* path){
         }
     
         free(node_data);
-
+        
         if (!node_found){
+            free(path_copy);
             return -ERR_PATH_NOT_EXIST;
         }
     }
     
+    free(path_copy);
     return curr_node_id;
 }
 
@@ -485,7 +488,6 @@ uint8_t* get_node_data(struct inode* inode){
 struct directory_item* get_directory_items(struct inode* dir_inode) {
     return (struct directory_item*)get_node_data(dir_inode);
 }
-
 
 void clear_inode(struct inode* inode){ 
     // set the inode as free in bitmap

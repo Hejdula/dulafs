@@ -7,6 +7,66 @@
 
 #define INPUT_BUFFER_SIZE 1024
 
+// Helper function to execute a command string
+// Returns the error code from command execution
+int execute_command_string(const char* input_string) {
+    if (!input_string || input_string[0] == '\0') {
+        return ERR_SUCCESS; // Empty lines are OK
+    }
+    
+    char* input_copy = strdup(input_string);
+    if (input_copy == NULL) { return ERR_MEMORY_ALLOCATION; }
+    
+    char* command_token = strtok(input_copy, " ");
+    if (command_token == NULL) { 
+        free(input_copy);
+        return ERR_SUCCESS; // Empty or whitespace-only lines
+    }
+
+    // count tokens after first one
+    int token_count = 1;
+    while (strtok(NULL, " ") != NULL) token_count++;
+
+    // Free the first copy and make a fresh one for argument parsing
+    free(input_copy);
+    input_copy = strdup(input_string);
+    if (input_copy == NULL) { return ERR_MEMORY_ALLOCATION; }
+
+    char** args = malloc(sizeof(char*) * token_count);
+    if (args == NULL) { 
+        free(input_copy);
+        return ERR_MEMORY_ALLOCATION;
+    }
+
+    args[0] = strtok(input_copy, " ");
+    char * command = args[0];
+    for (int i = 1; i < token_count; i++) {
+        args[i] = strtok(NULL, " ");
+    }
+
+    int error_code = ERR_UNKNOWN;
+    
+    // Check if command matches any known command and call its function
+    for (int i = 0; i < NUM_COMMANDS; i++){
+        if (!strcmp(command, commands[i].name)){
+            if (
+                !(token_count - 1 == commands[i].arg_count) 
+                && commands[i].arg_count != -1
+            ){
+                error_code = ERR_INVALID_ARGC;
+                break;
+            }
+            // execute the command
+            error_code = commands[i].function(token_count, args);
+            break;
+        }
+    }
+    
+    free(input_copy);
+    free(args);
+    return error_code;
+}
+
 void repl(){
     printf("Welcome to dula REPL, available commands: ");
     

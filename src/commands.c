@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "commands.h"
 #include "dulafs.h"
+#include "repl.h"
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -380,7 +381,42 @@ int cmd_outcp(int argc, char** argv) {
     return ERR_SUCCESS;
 }
 
-int cmd_load(int argc, char** argv) { printf("TODO: Load function called\n"); return ERR_SUCCESS; }
+int cmd_load(int argc, char** argv) {
+    FILE* fptr = fopen(argv[1], "r");
+    if (!fptr) {
+        return ERR_EXTERNAL_FILE_NOT_FOUND;
+    }
+    
+    char line_buffer[1024];
+    int line_count = 0;
+    int error_count = 0;
+    
+    while (fgets(line_buffer, sizeof(line_buffer), fptr) != NULL) {
+        // Remove newline character
+        line_buffer[strcspn(line_buffer, "\n")] = '\0';
+        
+        // Skip empty lines and comments (lines starting with #)
+        if (line_buffer[0] == '\0' || line_buffer[0] == '#') {
+            continue;
+        }
+        
+        int error_code = execute_command_string(line_buffer);
+        line_count++;
+        
+        if (error_code != ERR_SUCCESS) {
+            fprintf(stderr, "Line %d: Command failed with error code %d: %s\n", 
+                    line_count, error_code, get_error_message((ErrorCode)error_code));
+            error_count++;
+            // Continue executing remaining lines
+        }
+    }
+    
+    fclose(fptr);
+    
+    printf("Loaded %d commands, %d errors\n", line_count, error_count);
+    
+    return error_count > 0 ? ERR_UNKNOWN : ERR_SUCCESS;
+}
 int cmd_statfs(int argc, char** argv) { printf("TODO: Status filesystem function called\n"); return ERR_SUCCESS; }
 
 int ln(int argc, char** argv) {
@@ -425,7 +461,7 @@ struct CommandEntry commands[] = {
     {"info", cmd_info, 1},
     {"incp", cmd_incp, 2},
     {"outcp", cmd_outcp, 2},
-    {"load", cmd_load, 0},
+    {"load", cmd_load, 1},
     {"statfs", cmd_statfs, 0},
     {"ln", ln, 2},
     {"test", test, -1}

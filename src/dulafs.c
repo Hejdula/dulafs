@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-const int MAX_FILE_SIZE = (DIRECT_CLUSTER_COUNT + (CLUSTER_SIZE / sizeof(int*) + 1) * (CLUSTER_SIZE / sizeof(int*))) * CLUSTER_SIZE;
+const int MAX_FILE_SIZE = (DIRECT_CLUSTER_COUNT + (CLUSTER_SIZE / sizeof(int) + 1) * (CLUSTER_SIZE / sizeof(int))) * CLUSTER_SIZE;
 
 // Global system state
 struct SystemState g_system_state = {
@@ -304,7 +304,7 @@ int path_to_inode(char* path){
     free(path_copy);
     return curr_node_id;
 }
-
+    
 int* assign_node_clusters(struct inode* inode){
     int cluster_count = (inode->file_size + CLUSTER_SIZE - 1) / CLUSTER_SIZE;
     if(!cluster_count){
@@ -505,6 +505,24 @@ void clear_inode(struct inode* inode){
         }
     }
     free(clusters);
+
+    if(inode->indirect1) {
+        clear_bit(inode->indirect1, g_system_state.sb.bitmap_start_address);
+    }
+
+    if(inode->indirect2) {
+        int* cluster_ids = malloc(CLUSTER_SIZE);
+        int offset = g_system_state.sb.data_start_address + inode->indirect2 * CLUSTER_SIZE;
+        fseek(g_system_state.file_ptr, offset, SEEK_SET);
+        fread(cluster_ids, CLUSTER_SIZE, 1, g_system_state.file_ptr);
+        for (int i = 0; i < CLUSTER_SIZE / sizeof(int); i++){
+            if (cluster_ids[i] && cluster_ids[i] < g_system_state.sb.cluster_count){ 
+                clear_bit(cluster_ids[i], g_system_state.sb.bitmap_start_address);
+            }
+        }
+        clear_bit(inode->indirect2, g_system_state.sb.bitmap_start_address);
+        free(cluster_ids);
+    }
 }
 
 int delete_item(struct inode* inode, char* item_name){

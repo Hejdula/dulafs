@@ -29,11 +29,10 @@ int cmd_format(int argc, char** argv) {
 int enough_empty_clusters(int file_size){
     int empty_cluster_count = g_system_state.sb.cluster_count - count_ones(g_system_state.sb.bitmap_start_address, g_system_state.sb.cluster_count);
     int data_cluster_count = (file_size + CLUSTER_SIZE - 1) / CLUSTER_SIZE ; 
-    int pointers_per_cluster = CLUSTER_SIZE / sizeof(int*);
+    int pointers_per_cluster = CLUSTER_SIZE / sizeof(int);
     int indirect_2nd_used = (data_cluster_count > DIRECT_CLUSTER_COUNT + pointers_per_cluster) ? 1 : 0;
     int indirect_cluster_count =  (data_cluster_count - DIRECT_CLUSTER_COUNT) / pointers_per_cluster + indirect_2nd_used;
     int total_clusters_needed = indirect_cluster_count + data_cluster_count;
-    printf("clusters needed: %d\n", total_clusters_needed);
     return empty_cluster_count >= total_clusters_needed; 
 }
 
@@ -320,7 +319,7 @@ int cmd_incp(int argc, char** argv) {
     fseek(fptr, 0, SEEK_END);
     int file_size = ftell(fptr);
     
-    if (file_size > MAX_FILE_SIZE) { return ERR_FILE_TOO_LARGE; }
+    if (file_size > MAX_FILE_SIZE) { fclose(fptr); return ERR_FILE_TOO_LARGE; }
     if(!enough_empty_clusters(file_size)) { fclose(fptr); return ERR_CLUSTER_FULL; }
     
     // initialize the file inode

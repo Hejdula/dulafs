@@ -24,6 +24,7 @@ typedef enum {
     ERR_EXTERNAL_FILE_NOT_FOUND,
     ERR_CANNOT_HARDLINK_DIR,
     ERR_INVALID_ARGC,
+    ERR_FILE_TOO_LARGE,
     ERR_UNKNOWN
 } ErrorCode;
 
@@ -32,9 +33,9 @@ typedef enum {
 #define ROOT_NODE 0
 #define DIR_NAME_SIZE 12
 #define I_NODE_RATIO 0.02 
-#define CLUSTER_SIZE 1024
+#define CLUSTER_SIZE 128
 
-extern const int ID_ITEM_FREE;
+extern const int MAX_FILE_SIZE;
 
 struct superblock {
 //   char signature[9];             // login autora FS
@@ -88,6 +89,7 @@ int* get_node_clusters(struct inode* inode);
 struct inode get_inode(int node_id);
 int contains_file(struct inode* inode, char* file_name);
 struct directory_item* get_directory_items(struct inode* dir_node);
+int count_ones(int bitmap_offset, int size);
 
 
 void clear_inode(struct inode *inode);

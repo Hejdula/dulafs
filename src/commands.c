@@ -25,12 +25,28 @@ int cmd_format(int argc, char** argv) {
     return ERR_SUCCESS;
 }
 
+
+int enough_empty_clusters(int file_size){
+    int empty_cluster_count = g_system_state.sb.cluster_count - count_ones(g_system_state.sb.bitmap_start_address, g_system_state.sb.cluster_count);
+    int data_cluster_count = (file_size + CLUSTER_SIZE - 1) / CLUSTER_SIZE ; 
+    int pointers_per_cluster = CLUSTER_SIZE / sizeof(int*);
+    int indirect_2nd_used = (data_cluster_count > DIRECT_CLUSTER_COUNT + pointers_per_cluster) ? 1 : 0;
+    int indirect_cluster_count =  (data_cluster_count - DIRECT_CLUSTER_COUNT) / pointers_per_cluster + indirect_2nd_used;
+    int total_clusters_needed = indirect_cluster_count + data_cluster_count;
+    printf("clusters needed: %d\n", total_clusters_needed);
+    return empty_cluster_count >= total_clusters_needed; 
+}
+
 int cmd_cp(int argc, char** argv) {
     // get inode to copy
     int original_inode_id = path_to_inode(argv[1]); 
     if (original_inode_id < 0) return ERR_NO_SOURCE;
     struct inode original_node = get_inode(original_inode_id);
     if (!original_node.is_file) return ERR_NOT_A_FILE;
+
+    // check if there is space for the file
+    if (original_node.file_size > MAX_FILE_SIZE) { return ERR_FILE_TOO_LARGE;}
+    if (!enough_empty_clusters(original_node.file_size)){ return ERR_CLUSTER_FULL; };
 
     // separate destination path and filename
     char* file_name = NULL;
@@ -53,10 +69,7 @@ int cmd_cp(int argc, char** argv) {
     
     int* new_clusters = assign_node_clusters(&new_inode);
     int* original_clusters = get_node_clusters(&original_node);
-    if (original_clusters == NULL) {
-        clear_inode(&new_inode);
-        return ERR_MEMORY_ALLOCATION;
-    }
+    if (original_clusters == NULL) { clear_inode(&new_inode); free(original_clusters); return ERR_MEMORY_ALLOCATION; }
 
     // copy the data to new inode
     int cluster_count = (original_node.file_size + CLUSTER_SIZE - 1) / CLUSTER_SIZE;
@@ -301,10 +314,14 @@ int cmd_incp(int argc, char** argv) {
     char* file_name = NULL;
     int target_dir_id = get_dir_id(argv[2], &file_name); 
     if (target_dir_id < 0) { fclose(fptr); return -target_dir_id; } 
+    struct inode target_dir = get_inode(target_dir_id);
+    if (contains_file(&target_dir, file_name)) { return ERR_FILE_EXISTS; };
     
     fseek(fptr, 0, SEEK_END);
     int file_size = ftell(fptr);
     
+    if (file_size > MAX_FILE_SIZE) { return ERR_FILE_TOO_LARGE; }
+    if(!enough_empty_clusters(file_size)) { fclose(fptr); return ERR_CLUSTER_FULL; }
     
     // initialize the file inode
     
@@ -316,7 +333,6 @@ int cmd_incp(int argc, char** argv) {
     write_inode(&inode);
 
     // add the file into directory
-    struct inode target_dir = get_inode(target_dir_id);
     struct directory_item item = {0};
     item.inode = inode.id;
     strlcpy(item.item_name, file_name, sizeof(item.item_name));
@@ -352,7 +368,6 @@ int cmd_incp(int argc, char** argv) {
     fflush(g_system_state.file_ptr);
 
 
-
     fclose(fptr);
     free(clusters);
     return ERR_SUCCESS;
@@ -377,6 +392,7 @@ int cmd_outcp(int argc, char** argv) {
     }
 
     fclose(fptr);
+    free(data);
 
     return ERR_SUCCESS;
 }
@@ -417,7 +433,22 @@ int cmd_load(int argc, char** argv) {
     
     return error_count > 0 ? ERR_UNKNOWN : ERR_SUCCESS;
 }
-int cmd_statfs(int argc, char** argv) { printf("TODO: Status filesystem function called\n"); return ERR_SUCCESS; }
+int cmd_statfs(int argc, char** argv) {
+    if (g_system_state.sb.disk_size == 0){ return ERR_UNKNOWN; }
+
+    printf("=== Filesystem Info ===\n");
+    printf("Disk size: %d bytes\n", g_system_state.sb.disk_size);
+    printf("Cluster size: %d bytes\n", g_system_state.sb.cluster_size);
+
+    int used_inodes = count_ones(g_system_state.sb.bitmapi_start_address, g_system_state.sb.inode_count);
+    int used_clusters = count_ones(g_system_state.sb.bitmap_start_address, g_system_state.sb.cluster_count);
+
+    printf("inodes: %d used out of %d\n", used_inodes, g_system_state.sb.inode_count);
+    printf("clusters: %d used out of %d\n", used_clusters, g_system_state.sb.cluster_count);
+    printf("===============================\n");
+
+    return ERR_SUCCESS;
+}
 
 int ln(int argc, char** argv) {
     // get inode to link

@@ -4,9 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-
-
-const int ID_ITEM_FREE = 0;
+const int MAX_FILE_SIZE = (DIRECT_CLUSTER_COUNT + (CLUSTER_SIZE / sizeof(int*) + 1) * (CLUSTER_SIZE / sizeof(int*))) * CLUSTER_SIZE;
 
 // Global system state
 struct SystemState g_system_state = {
@@ -36,6 +34,7 @@ const char* get_error_message(ErrorCode code) {
         case ERR_EXTERNAL_FILE_NOT_FOUND: return "External file not found";
         case ERR_CANNOT_HARDLINK_DIR: return "Cannot hard link a directory";
         case ERR_INVALID_ARGC: return "Invalid number of arguments"; 
+        case ERR_FILE_TOO_LARGE: return "File too large";
         default: return "Unknown error";
     }
 }
@@ -401,6 +400,7 @@ int* assign_node_clusters(struct inode* inode){
     free(indirect_arr);
     free(indirect_clusters);
     write_inode(inode);
+
     return carr;
 }
 
@@ -416,7 +416,9 @@ int* get_node_clusters(struct inode* inode){
         carr[i] = inode->direct[i];
     }
 
-    if (!inode->indirect1) return carr;
+    if (!inode->indirect1){ 
+        return carr; 
+    }
 
     int max_1st_indirect = CLUSTER_SIZE / sizeof(int);
     
@@ -462,6 +464,7 @@ int* get_node_clusters(struct inode* inode){
         }
     }
 
+    
     free(indirect_arr);
     free(indirect_clusters);
     return carr;
@@ -633,6 +636,21 @@ int format(int size){
     printf("Data start address: %d\n", sb.data_start_address);
 
     return ERR_SUCCESS;
+}
+
+// size in bits
+int count_ones(int bitmap_offset, int size){
+    uint8_t* data = malloc((size + 7)/8);
+    fseek(g_system_state.file_ptr, bitmap_offset, SEEK_SET);
+    fread(data, (size + 7)/8, 1, g_system_state.file_ptr);
+    int byte, bit, count = 0;
+    for (int i = 0; i < size; i++) {
+        byte = i/8;
+        bit = i%8;
+        if((data[byte] >> bit) & 1) count ++; 
+    } 
+    free(data);
+    return count;
 }
 
 int test() {

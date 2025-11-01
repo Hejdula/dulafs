@@ -91,6 +91,10 @@ int contains_file(struct inode* inode, char* file_name);
 struct directory_item* get_directory_items(struct inode* dir_node);
 int count_ones(int bitmap_offset, int size);
 
+// Moved from commands.c: utility functions operating on global fs state
+int enough_empty_clusters(int file_size);
+int count_dirs();
+
 
 void clear_inode(struct inode *inode);
 int create_dir_node(int up_ref);

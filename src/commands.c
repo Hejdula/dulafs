@@ -26,15 +26,7 @@ int cmd_format(int argc, char** argv) {
 }
 
 
-int enough_empty_clusters(int file_size){
-    int empty_cluster_count = g_system_state.sb.cluster_count - count_ones(g_system_state.sb.bitmap_start_address, g_system_state.sb.cluster_count);
-    int data_cluster_count = (file_size + CLUSTER_SIZE - 1) / CLUSTER_SIZE ; 
-    int pointers_per_cluster = CLUSTER_SIZE / sizeof(int);
-    int indirect_2nd_used = (data_cluster_count > DIRECT_CLUSTER_COUNT + pointers_per_cluster) ? 1 : 0;
-    int indirect_cluster_count =  (data_cluster_count - DIRECT_CLUSTER_COUNT) / pointers_per_cluster + indirect_2nd_used;
-    int total_clusters_needed = indirect_cluster_count + data_cluster_count;
-    return empty_cluster_count >= total_clusters_needed; 
-}
+/* enough_empty_clusters moved to dulafs.c */
 
 int cmd_cp(int argc, char** argv) {
     // get inode to copy
@@ -432,6 +424,9 @@ int cmd_load(int argc, char** argv) {
     
     return error_count > 0 ? ERR_UNKNOWN : ERR_SUCCESS;
 }
+
+/* count_dirs moved to dulafs.c */
+
 int cmd_statfs(int argc, char** argv) {
     if (g_system_state.sb.disk_size == 0){ return ERR_UNKNOWN; }
 
@@ -441,9 +436,13 @@ int cmd_statfs(int argc, char** argv) {
 
     int used_inodes = count_ones(g_system_state.sb.bitmapi_start_address, g_system_state.sb.inode_count);
     int used_clusters = count_ones(g_system_state.sb.bitmap_start_address, g_system_state.sb.cluster_count);
+    int directories = count_dirs();
+    int files = used_inodes - directories;
 
     printf("inodes: %d used out of %d\n", used_inodes, g_system_state.sb.inode_count);
     printf("clusters: %d used out of %d\n", used_clusters, g_system_state.sb.cluster_count);
+    printf("number of directories: %d\n", directories);
+    printf("number of files: %d\n", files);
     printf("===============================\n");
 
     return ERR_SUCCESS;

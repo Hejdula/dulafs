@@ -671,6 +671,28 @@ int count_ones(int bitmap_offset, int size){
     return count;
 }
 
+// Check if there are enough empty clusters available for a file of given size
+int enough_empty_clusters(int file_size){
+    int empty_cluster_count = g_system_state.sb.cluster_count - count_ones(g_system_state.sb.bitmap_start_address, g_system_state.sb.cluster_count);
+    int data_cluster_count = (file_size + CLUSTER_SIZE - 1) / CLUSTER_SIZE ; 
+    int pointers_per_cluster = CLUSTER_SIZE / sizeof(int);
+    int indirect_2nd_used = (data_cluster_count > DIRECT_CLUSTER_COUNT + pointers_per_cluster) ? 1 : 0;
+    int indirect_cluster_count =  (data_cluster_count - DIRECT_CLUSTER_COUNT) / pointers_per_cluster + indirect_2nd_used;
+    int total_clusters_needed = indirect_cluster_count + data_cluster_count;
+    return empty_cluster_count >= total_clusters_needed; 
+}
+
+// Count directories by scanning used inodes and checking is_file flag
+int count_dirs(){
+    int used_inodes = count_ones(g_system_state.sb.bitmapi_start_address, g_system_state.sb.inode_count);
+    int dir_count = 0;
+    for(int i = 0; i < used_inodes; i++){
+        struct inode inode = get_inode(i);
+        if(!inode.is_file) dir_count++;
+    }
+    return dir_count;
+}
+
 int test() {
     
     printf("=== Test Complete ===\n");

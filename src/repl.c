@@ -148,6 +148,11 @@ int execute_command_string(const char* input_string) {
         args[i] = strtok(NULL, " ");
     }
 
+    if (!strcmp(input_copy, "exit")){
+        free(input_copy);
+        return ERR_SUCCESS;
+    }
+
     int error_code = ERR_UNKNOWN;
     
     // Check if command matches any known command and call its function

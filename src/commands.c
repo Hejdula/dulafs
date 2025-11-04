@@ -25,9 +25,6 @@ int cmd_format(int argc, char** argv) {
     return ERR_SUCCESS;
 }
 
-
-/* enough_empty_clusters moved to dulafs.c */
-
 int cmd_cp(int argc, char** argv) {
     // get inode to copy
     int original_inode_id = path_to_inode(argv[1]); 
@@ -284,7 +281,7 @@ int cmd_info(int argc, char** argv) {
             inode.references);
     printf(" | clusters: [");
     for (int i = 0; i < cluster_count - 1; i++){
-        printf("%d, ", clusters[1]);
+        printf("%d, ", clusters[i]);
     }
     printf("%d]\n", clusters[cluster_count - 1]);
     fflush(stdout);
@@ -412,9 +409,11 @@ int cmd_load(int argc, char** argv) {
         
         if (error_code != ERR_SUCCESS) {
             fprintf(stderr, "Line %d: Command failed with error code %d: %s\n", 
-                    line_count, error_code, get_error_message((ErrorCode)error_code));
+                    line_count, 
+                    error_code, 
+                    get_error_message((ErrorCode)error_code)
+                );
             error_count++;
-            // Continue executing remaining lines
         }
     }
     
@@ -422,7 +421,7 @@ int cmd_load(int argc, char** argv) {
     
     printf("Loaded %d commands, %d errors\n", line_count, error_count);
     
-    return error_count > 0 ? ERR_UNKNOWN : ERR_SUCCESS;
+    return ERR_SUCCESS;
 }
 
 /* count_dirs moved to dulafs.c */

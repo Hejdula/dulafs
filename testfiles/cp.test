@@ -1,0 +1,18 @@
+format 100000
+mkdir a
+incp hello hello
+
+cp nonexistent hi
+cp hello invalidpath/hi
+cp hello a/hi
+cp a/hi hello2
+cat hello
+cat a/hi
+
+rm a/hi
+rm hello
+rm hello2
+rmdir a
+load ./testfiles/hello.test
+exit
+cat nonexiting

@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-const int MAX_FILE_SIZE = (DIRECT_CLUSTER_COUNT + (CLUSTER_SIZE / sizeof(int) + 1) * (CLUSTER_SIZE / sizeof(int))) * CLUSTER_SIZE;
+const long long int MAX_FILE_SIZE = (DIRECT_CLUSTER_COUNT + (CLUSTER_SIZE / sizeof(int) + 1) * (CLUSTER_SIZE / sizeof(int))) * CLUSTER_SIZE;
 
 // Global system state
 struct SystemState g_system_state = {
@@ -70,7 +70,6 @@ int read_bit(int i, int bitmap_offset){
     uint8_t byte = fgetc(g_system_state.file_ptr);
     return (byte >> bit_offset) & 1;
 }
-
 
 /**
  * @brief Get the Superblock object
@@ -138,6 +137,10 @@ int get_empty_index(int bitmap_offset){
     // printf("final offset in get_empty_index: %d\n", byte_index * 8 + bit_offset);
     return byte_index * 8 + bit_offset;
 }
+
+int unused_inodes_left(){
+    return g_system_state.sb.inode_count - count_ones(g_system_state.sb.bitmapi_start_address, g_system_state.sb.inode_count);
+};
 
 int assign_empty_inode(){
     int node_id = get_empty_index(g_system_state.sb.bitmapi_start_address);
@@ -579,7 +582,7 @@ int add_record_to_dir(struct directory_item record, struct inode* dir_inode){
     added_inode.references += 1;
     write_inode(&added_inode);
 
-    // Always append to the end since we compact on deletion
+    // Always append to the end since its compacted on deletion
     int final_offset = g_system_state.sb.data_start_address + dir_inode->direct[0] * CLUSTER_SIZE + dir_inode->file_size;
 
     fseek(g_system_state.file_ptr, final_offset, SEEK_SET);

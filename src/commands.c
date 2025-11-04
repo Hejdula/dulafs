@@ -11,9 +11,26 @@
 
 // Command function implementations
 int cmd_format(int argc, char** argv) {
+    int multiplier = 1, length;
 
     if(argc != 2){
         return ERR_INVALID_ARGC;
+    }
+
+    length = strlen(argv[1]);
+
+    if(argv[1][length-1] == 'B' && length > 2){
+        switch (argv[1][length-2]){
+            case 'K':
+                multiplier = 1024;
+                break;
+            case 'M':
+                multiplier = 1024*1024;
+                break;
+            default:
+                return ERR_INVALID_SIZE;
+        };
+        argv[1][length-2] = '\0';
     }
 
     char* endptr;
@@ -21,11 +38,13 @@ int cmd_format(int argc, char** argv) {
     if (*endptr != '\0' || size <= 0) {
         return ERR_INVALID_SIZE;
     }
+    size *= multiplier;
     format((int)size);
     return ERR_SUCCESS;
 }
 
 int cmd_cp(int argc, char** argv) {
+    if(!unused_inodes_left()) return ERR_INODE_FULL;
     // get inode to copy
     int original_inode_id = path_to_inode(argv[1]); 
     if (original_inode_id < 0) return ERR_NO_SOURCE;
@@ -155,6 +174,7 @@ int cmd_rm(int argc, char** argv) {
 }
 
 int cmd_mkdir(int argc, char** argv) {
+    if (!unused_inodes_left()) return ERR_INODE_FULL;
     char* dir_name = NULL;
     int parent_dir_id = get_dir_id(argv[1], &dir_name); 
     if (parent_dir_id < 0) { return -parent_dir_id; }
@@ -291,9 +311,8 @@ int cmd_info(int argc, char** argv) {
 }
 
 int cmd_incp(int argc, char** argv) {
-
+    if (!unused_inodes_left()) return ERR_INODE_FULL;
     FILE* fptr = fopen(argv[1],"r");
-
     if (!fptr){
         return ERR_EXTERNAL_FILE_NOT_FOUND;
     }
@@ -309,7 +328,7 @@ int cmd_incp(int argc, char** argv) {
     int file_size = ftell(fptr);
     
     if (file_size > MAX_FILE_SIZE) { fclose(fptr); return ERR_FILE_TOO_LARGE; }
-    if(!enough_empty_clusters(file_size)) { fclose(fptr); return ERR_CLUSTER_FULL; }
+    if (!enough_empty_clusters(file_size)) { fclose(fptr); return ERR_CLUSTER_FULL; }
     
     // initialize the file inode
     
@@ -362,20 +381,21 @@ int cmd_incp(int argc, char** argv) {
 }
 
 int cmd_outcp(int argc, char** argv) {
-    FILE* fptr = fopen(argv[2], "w+");
-    if(!fptr) return ERR_EXTERNAL_FILE_NOT_FOUND;
-
+    
     int file_node_id= path_to_inode(argv[1]);
     if (file_node_id < 0) {
-        fclose(fptr);
         return -file_node_id;
     }
     struct inode file_inode = get_inode(file_node_id);
-
+    
     uint8_t* data = get_node_data(&file_inode);
+
+    FILE* fptr = fopen(argv[2], "w+");
+    if(!fptr) {free(data); return ERR_EXTERNAL_FILE_NOT_FOUND;};
 
     if(!fwrite(data, file_inode.file_size, 1,fptr)) {
         fclose(fptr);
+        free(data);
         return ERR_UNKNOWN;
     }
 

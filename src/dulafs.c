@@ -14,7 +14,12 @@ struct SystemState g_system_state = {
     .sb = {0}
 };
 
-// Error message mapping
+/**
+ * @brief Returns the string representation of an error code.
+ * 
+ * @param code The error code to translate.
+ * @return const char* The error message string, or NULL if success.
+ */
 const char* get_error_message(ErrorCode code) {
     switch (code) {
         case ERR_SUCCESS: return NULL;
@@ -39,7 +44,12 @@ const char* get_error_message(ErrorCode code) {
     }
 }
 
-
+/**
+ * @brief Set i-th bit in a given bitmap
+ * 
+ * @param i index of bit, starting from 0
+ * @param bitmap_offset bitmap to operate on
+ */
 void set_bit(int i, int bitmap_offset){
     int byte_index = i/8;
     int bit_offset = i%8;
@@ -52,6 +62,12 @@ void set_bit(int i, int bitmap_offset){
     fflush(g_system_state.file_ptr);
 }
 
+/**
+ * @brief Clear i-th bit in a given bitmap.
+ * 
+ * @param i Index of bit, starting from 0.
+ * @param bitmap_offset Byte offset of the bitmap in the file.
+ */
 void clear_bit(int i, int bitmap_offset){
     int byte_index = i/8;
     int bit_offset = i%8;
@@ -63,6 +79,13 @@ void clear_bit(int i, int bitmap_offset){
     fflush(g_system_state.file_ptr);
 }
 
+/**
+ * @brief Read the value of the i-th bit in a given bitmap.
+ * 
+ * @param i Index of bit, starting from 0.
+ * @param bitmap_offset Byte offset of the bitmap in the file.
+ * @return int The value of the bit (0 or 1).
+ */
 int read_bit(int i, int bitmap_offset){
     int byte_index = i/8;
     int bit_offset = i%8;
@@ -75,7 +98,7 @@ int read_bit(int i, int bitmap_offset){
  * @brief Get the Superblock object
  * 
  * @param disk_size in bytes
- * @return struct superblock 
+ * @return struct superblock The initialized superblock structure.
  */
 struct superblock get_superblock(int disk_size){
     // Calculate available space (excluding superblock)
@@ -118,6 +141,11 @@ struct superblock get_superblock(int disk_size){
     return sup;
 }
 
+/**
+ * @brief Write an inode structure to disk.
+ * 
+ * @param inode Pointer to the inode structure to write.
+ */
 void write_inode(struct inode* inode){
     long offset = g_system_state.sb.inode_start_address + inode->id * sizeof(struct inode);
     fseek(g_system_state.file_ptr, offset, SEEK_SET);
@@ -125,6 +153,12 @@ void write_inode(struct inode* inode){
     fflush(g_system_state.file_ptr);
 }
 
+/**
+ * @brief Find the index of the first unset (0) bit in a bitmap.
+ * 
+ * @param bitmap_offset Byte offset of the bitmap in the file.
+ * @return int The index of the first empty bit.
+ */
 int get_empty_index(int bitmap_offset){
     int byte_index = 0;
     int bit_offset = 0;
@@ -138,10 +172,20 @@ int get_empty_index(int bitmap_offset){
     return byte_index * 8 + bit_offset;
 }
 
+/**
+ * @brief Calculate the number of unused inodes remaining.
+ * 
+ * @return int Number of free inodes.
+ */
 int unused_inodes_left(){
     return g_system_state.sb.inode_count - count_ones(g_system_state.sb.bitmapi_start_address, g_system_state.sb.inode_count);
 };
 
+/**
+ * @brief Find a free inode, mark it as used, and return its ID.
+ * 
+ * @return int The ID of the assigned inode, or -1 if full.
+ */
 int assign_empty_inode(){
     int node_id = get_empty_index(g_system_state.sb.bitmapi_start_address);
     if (node_id >= g_system_state.sb.inode_count) return -1;
@@ -149,6 +193,11 @@ int assign_empty_inode(){
     return node_id;
 }
 
+/**
+ * @brief Find a free cluster, mark it as used, and return its ID.
+ * 
+ * @return int The ID of the assigned cluster, or -1 if full.
+ */
 int assign_empty_cluster(){
     int cluster_id = get_empty_index(g_system_state.sb.bitmap_start_address);
     if (cluster_id >= g_system_state.sb.cluster_count) return -1;
@@ -156,6 +205,12 @@ int assign_empty_cluster(){
     return cluster_id;
 }
 
+/**
+ * @brief Read an inode from disk by its ID.
+ * 
+ * @param node_id The ID of the inode to read.
+ * @return struct inode The inode structure read from disk.
+ */
 struct inode get_inode(int node_id){
     struct inode inode;
     fseek(g_system_state.file_ptr, g_system_state.sb.inode_start_address + node_id * sizeof(struct inode), SEEK_SET);
@@ -163,6 +218,13 @@ struct inode get_inode(int node_id){
     return inode;
 }
 
+/**
+ * @brief Check if a directory contains a file with the given name.
+ * 
+ * @param inode Pointer to the directory inode.
+ * @param file_name Name of the file to search for.
+ * @return int 1 if found, 0 otherwise.
+ */
 int contains_file(struct inode* inode, char* file_name){
     if (inode->is_file) {
         return 0;
@@ -185,6 +247,12 @@ int contains_file(struct inode* inode, char* file_name){
     return found;
 }
 
+/**
+ * @brief Reconstruct the full path string for a given inode ID.
+ * 
+ * @param inode_id The ID of the inode.
+ * @return char* The full path string (must be freed by caller), or NULL on error.
+ */
 char* inode_to_path(int inode_id){
     struct inode curr_inode = get_inode(inode_id);
     int prev_inode_id = -1;
@@ -225,8 +293,12 @@ char* inode_to_path(int inode_id){
     return path;
 }
 
-// Extract and return pointer to the final token/name from a path
-// "/foo/bar/file.txt" -> "file.txt", "file.txt" -> "file.txt"
+/**
+ * @brief Extract and return pointer to the final token/name from a path.
+ * 
+ * @param path The full path string.
+ * @return char* Pointer to the last component of the path.
+ */
 char* get_final_token(char* path) {
     if (!path) return NULL;
     
@@ -238,9 +310,9 @@ char* get_final_token(char* path) {
  * @brief Get the dir id object returns id of directory which contains the path target,
  * also set the target_name to point into path to the target name
  * 
- * @param path 
- * @param target_name 
- * @return int 
+ * @param path The full path to the target.
+ * @param target_name Output pointer to the start of the target name within the path string.
+ * @return int The inode ID of the parent directory, or negative error code.
  */
 int get_dir_id(char* path, char** target_name){
     size_t length = strlen(path);
@@ -265,6 +337,12 @@ int get_dir_id(char* path, char** target_name){
     return retval;
 }
 
+/**
+ * @brief Resolve a path string to an inode ID.
+ * 
+ * @param path The path to resolve.
+ * @return int The inode ID, or negative error code.
+ */
 int path_to_inode(char* path){
     // invalid path if ends with '/'
     size_t length = strlen(path);
@@ -308,6 +386,12 @@ int path_to_inode(char* path){
     return curr_node_id;
 }
     
+/**
+ * @brief "Allocate" clusters for an inode based on its size, handling direct and indirect blocks.
+ * Sets the bits of relevant clusters to full in the bitmap.
+ * @param inode Pointer to the inode to assign clusters to.
+ * @return int* Array of assigned cluster IDs (must be freed), or NULL on failure.
+ */
 int* assign_node_clusters(struct inode* inode){
     int cluster_count = (inode->file_size + CLUSTER_SIZE - 1) / CLUSTER_SIZE;
     if(!cluster_count){
@@ -407,6 +491,12 @@ int* assign_node_clusters(struct inode* inode){
     return carr;
 }
 
+/**
+ * @brief Retrieve the array of cluster IDs used by an inode.
+ * 
+ * @param inode Pointer to the inode.
+ * @return int* Array of cluster IDs (must be freed), or NULL if empty/error.
+ */
 int* get_node_clusters(struct inode* inode){
     int cluster_count = (inode->file_size + CLUSTER_SIZE - 1) / CLUSTER_SIZE;
     if(!cluster_count){
@@ -473,6 +563,12 @@ int* get_node_clusters(struct inode* inode){
     return carr;
 }
 
+/**
+ * @brief Read all data associated with an inode into a buffer.
+ * 
+ * @param inode Pointer to the inode.
+ * @return uint8_t* Buffer containing the data (must be freed), or NULL if empty.
+ */
 uint8_t* get_node_data(struct inode* inode){
     if (!inode->file_size) return NULL;
     int* cluster_arr = get_node_clusters(inode);
@@ -491,10 +587,21 @@ uint8_t* get_node_data(struct inode* inode){
     return data;
 };
 
+/**
+ * @brief Helper to get directory items from a directory inode.
+ * 
+ * @param dir_inode Pointer to the directory inode.
+ * @return struct directory_item* Array of directory items (must be freed).
+ */
 struct directory_item* get_directory_items(struct inode* dir_inode) {
     return (struct directory_item*)get_node_data(dir_inode);
 }
 
+/**
+ * @brief Free an inode and all its associated clusters/blocks.
+ * Clears all bits of inode clusters and the inode itself
+ * @param inode Pointer to the inode to clear.
+ */
 void clear_inode(struct inode* inode){ 
     // set the inode as free in bitmap
     clear_bit(inode->id, g_system_state.sb.bitmapi_start_address);
@@ -528,6 +635,14 @@ void clear_inode(struct inode* inode){
     }
 }
 
+/**
+ * @brief Remove a file or directory entry from a parent directory inode.
+ * If there are no more references to the item, it is cleared
+ * 
+ * @param inode Pointer to the parent directory inode.
+ * @param item_name Name of the item to remove.
+ * @return int Error code (ERR_SUCCESS on success).
+ */
 int delete_item(struct inode* inode, char* item_name){
     if (inode->is_file){ return ERR_NOT_A_DIRECTORY; }
     struct directory_item* dir_content = get_directory_items(inode);
@@ -577,6 +692,13 @@ int delete_item(struct inode* inode, char* item_name){
     return ERR_SUCCESS;
 }
 
+/**
+ * @brief Add a new entry to a directory inode.
+ * 
+ * @param record The directory item structure to add.
+ * @param dir_inode Pointer to the target directory inode.
+ * @return int EXIT_SUCCESS on success.
+ */
 int add_record_to_dir(struct directory_item record, struct inode* dir_inode){ 
     struct inode added_inode = get_inode(record.inode);
     added_inode.references += 1;
@@ -594,7 +716,12 @@ int add_record_to_dir(struct directory_item record, struct inode* dir_inode){
     return EXIT_SUCCESS;
 }
 
-// Initialize a directory with . and .. entries
+/**
+ * @brief Initialize a directory with '.' and '..' entries.
+ * 
+ * @param dir_inode Pointer to the directory inode to initialize.
+ * @param parent_inode_id Inode ID of the parent directory.
+ */
 void init_directory(struct inode* dir_inode, int parent_inode_id) {
     struct directory_item entries[2] = {0};
     
@@ -617,6 +744,12 @@ void init_directory(struct inode* dir_inode, int parent_inode_id) {
     write_inode(dir_inode);
 }
 
+/**
+ * @brief Creates a new directory inode.
+ * 
+ * @param up_ref_id Inode ID of the parent directory.
+ * @return int The ID of the newly created directory inode.
+ */
 int create_dir_node(int up_ref_id){
     struct inode inode;
     memset(&inode, 0, sizeof(struct inode));
@@ -631,6 +764,12 @@ int create_dir_node(int up_ref_id){
     return inode.id;
 }
 
+/**
+ * @brief Format the virtual disk with the filesystem structure.
+ * 
+ * @param size Size of the disk in bytes.
+ * @return int Error code (ERR_SUCCESS on success).
+ */
 int format(int size){
 
     struct superblock sb = get_superblock(size);
@@ -659,7 +798,13 @@ int format(int size){
     return ERR_SUCCESS;
 }
 
-// size in bits
+/**
+ * @brief Count the number of set ones in a bitmap region.
+ * 
+ * @param bitmap_offset Byte offset of the bitmap start.
+ * @param size Size of the bitmap in bits.
+ * @return int Number of set bits.
+ */
 int count_ones(int bitmap_offset, int size){
     uint8_t* data = malloc((size + 7)/8);
     fseek(g_system_state.file_ptr, bitmap_offset, SEEK_SET);
@@ -674,7 +819,12 @@ int count_ones(int bitmap_offset, int size){
     return count;
 }
 
-// Check if there are enough empty clusters available for a file of given size
+/**
+ * @brief Checks if there are enough empty clusters available for a file of given size.
+ * 
+ * @param file_size Size of the file in bytes.
+ * @return int 1 if enough space, 0 otherwise.
+ */
 int enough_empty_clusters(int file_size){
     int empty_cluster_count = g_system_state.sb.cluster_count - count_ones(g_system_state.sb.bitmap_start_address, g_system_state.sb.cluster_count);
     int data_cluster_count = (file_size + CLUSTER_SIZE - 1) / CLUSTER_SIZE ; 
@@ -685,7 +835,11 @@ int enough_empty_clusters(int file_size){
     return empty_cluster_count >= total_clusters_needed; 
 }
 
-// Count directories by scanning used inodes and checking is_file flag
+/**
+ * @brief Counts the total number of directories in the system.
+ * 
+ * @return int Number of directories.
+ */
 int count_dirs(){
     int used_inodes = count_ones(g_system_state.sb.bitmapi_start_address, g_system_state.sb.inode_count);
     int dir_count = 0;
@@ -696,6 +850,11 @@ int count_dirs(){
     return dir_count;
 }
 
+/**
+ * @brief Placeholder for test command.
+ * 
+ * @return int Error code.
+ */
 int test() {
     
     printf("=== Test Complete ===\n");

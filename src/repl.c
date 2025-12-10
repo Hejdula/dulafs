@@ -1,193 +1,215 @@
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
 #include "repl.h"
 #include "commands.h"
 #include "dulafs.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define INPUT_BUFFER_SIZE 1024
 
-
 /**
  * @brief Starts the Read-Eval-Print Loop (REPL) for the filesystem shell.
- * 
- * Displays a welcome message and available commands. Continuously prompts the user
- * for input, parses the command line, executes the corresponding command function,
- * and displays the result or error message. The loop terminates when "exit" is entered
- * or EOF is encountered.
+ *
+ * Displays a welcome message and available commands. Continuously prompts the
+ * user for input, parses the command line, executes the corresponding command
+ * function, and displays the result or error message. The loop terminates when
+ * "exit" is entered or EOF is encountered.
  */
-void repl(){
-    printf("Welcome to dula REPL, available commands: ");
-    
-    // Print available commands
-    for(int i = 0; i < NUM_COMMANDS; i++){
-        printf("%s", commands[i].name);
-        if(i < NUM_COMMANDS - 1) printf(", ");
+void repl() {
+  printf("Welcome to dula REPL, available commands: ");
+
+  // Print available commands
+  for (int i = 0; i < NUM_COMMANDS; i++) {
+    printf("%s", commands[i].name);
+    if (i < NUM_COMMANDS - 1)
+      printf(", ");
+  }
+  printf("\n");
+
+  char *input = malloc(sizeof(char) * INPUT_BUFFER_SIZE);
+  // char* argv;
+
+  int last_error_num = 0;
+  int last_command_executed = 0;
+
+  while (1) {
+
+    if (last_command_executed) {
+      if (last_error_num == 0) {
+        printf("[\033[0;32mok\033[0m] ");
+      } else {
+        printf("[\033[0;31m%d\033[0m] ", last_error_num);
+      }
     }
-    printf("\n");
-    
-    char* input = malloc(sizeof(char) * INPUT_BUFFER_SIZE);
-    // char* argv;
+    last_command_executed = 0;
+    printf("\033[38;5;117mdulafs\033[0m:\033[38;5;227m%s\033[0m> ",
+           g_system_state.working_dir);
+    fflush(stdout);
 
-    int last_error_num = 0;
-    int last_command_executed = 0;
-    
-    while (1) {
-
-        if (last_command_executed) {
-            if (last_error_num == 0) { printf("[\033[0;32mok\033[0m] "); }
-            else { printf("[\033[0;31m%d\033[0m] ", last_error_num); }
-        }
-        last_command_executed = 0;
-        printf("\033[38;5;117mdulafs\033[0m:\033[38;5;227m%s\033[0m> ", g_system_state.working_dir);
-        fflush(stdout); 
-
-        if (fgets(input, INPUT_BUFFER_SIZE, stdin) == NULL) {
-            printf("\nError reading input\n");
-            break;
-        }
-        
-        input[strcspn(input, "\n")] = '\0';
-        
-        char* input_copy = strdup(input);
-        if (input_copy == NULL) { printf("Memory allocation failed\n"); continue; }
-        
-        char* command_token = strtok(input_copy," ");
-        if (command_token == NULL) { free(input_copy); continue; }
-        
-        if (!strcmp(command_token, "exit")){
-            free(input_copy);
-            break;
-        }
-
-        // count tokens after first one
-        int token_count = 1;
-        while (strtok(NULL, " ") != NULL) token_count++;
-
-        // Free the first copy and make a fresh one for argument parsing
-        free(input_copy);
-        input_copy = strdup(input);
-        if (input_copy == NULL) { printf("Memory allocation failed\n"); continue; }
-
-        char** args = malloc(sizeof(char*) * token_count);
-        if (args == NULL) { printf("Memory allocation failed\n"); free(input_copy); continue; }
-        
-        args[0] = strtok(input_copy, " ");
-        char * command = args[0];
-        for (int i = 1; i < token_count; i++) {
-            args[i] = strtok(NULL, " ");
-            // printf("arg[%d]: %s\n",i,args[i]);
-        } 
-
-        // Check if command matches any known command and call its function
-        int command_found = 0;
-        for (int i = 0; i < NUM_COMMANDS; i++){
-            if (!strcmp(command, commands[i].name)){
-                command_found = 1;
-                if (
-                    !(token_count - 1 == commands[i].arg_count) 
-                    && commands[i].arg_count != -1
-                ){
-                    printf("Invalid number of arguments for function %s, expected: %d, got %d\n", commands[i].name, commands[i].arg_count, token_count - 1);
-                    break;
-                }
-                // execute the command
-                last_error_num = commands[i].function(token_count, args);
-                last_command_executed = 1;
-                if (last_error_num != ERR_SUCCESS) {
-                    // Command failed, print error message
-                    const char* error_msg = get_error_message((ErrorCode)last_error_num);
-                    if (error_msg) {
-                        fprintf(stderr, "Error: %s\n", error_msg);
-                    } else {
-                        fprintf(stderr, "Command returned with error code: %d\n", last_error_num);
-                    }
-                }
-                break;
-            }
-        }
-        
-        if (!command_found){
-            printf("Unknown command: %s\n", command);
-        }
-        
-        free(input_copy);
-        free(args);
-
+    if (fgets(input, INPUT_BUFFER_SIZE, stdin) == NULL) {
+      printf("\nError reading input\n");
+      break;
     }
 
-    free(input);
-    return;
-}
+    input[strcspn(input, "\n")] = '\0';
 
-/**
- * @brief Parses and executes a single command string.
- * 
- * Tokenizes the input string into command and arguments, validates the argument count,
- * and calls the corresponding command function if found.
- * 
- * @param input_string The full command line string to execute.
- * @return int The error code returned by the command, or ERR_UNKNOWN/ERR_INVALID_ARGC/ERR_MEMORY_ALLOCATION.
- */
-int execute_command_string(const char* input_string) {
-    if (!input_string || input_string[0] == '\0') {
-        return ERR_SUCCESS; // Empty lines are OK
+    char *input_copy = strdup(input);
+    if (input_copy == NULL) {
+      printf("Memory allocation failed\n");
+      continue;
     }
-    
-    char* input_copy = strdup(input_string);
-    if (input_copy == NULL) { return ERR_MEMORY_ALLOCATION; }
-    
-    char* command_token = strtok(input_copy, " ");
-    if (command_token == NULL) { 
-        free(input_copy);
-        return ERR_SUCCESS; // Empty or whitespace-only lines
+
+    char *command_token = strtok(input_copy, " ");
+    if (command_token == NULL) {
+      free(input_copy);
+      continue;
+    }
+
+    if (!strcmp(command_token, "exit")) {
+      free(input_copy);
+      break;
     }
 
     // count tokens after first one
     int token_count = 1;
-    while (strtok(NULL, " ") != NULL) token_count++;
+    while (strtok(NULL, " ") != NULL)
+      token_count++;
 
     // Free the first copy and make a fresh one for argument parsing
     free(input_copy);
-    input_copy = strdup(input_string);
-    if (input_copy == NULL) { return ERR_MEMORY_ALLOCATION; }
+    input_copy = strdup(input);
+    if (input_copy == NULL) {
+      printf("Memory allocation failed\n");
+      continue;
+    }
 
-    char** args = malloc(sizeof(char*) * token_count);
-    if (args == NULL) { 
-        free(input_copy);
-        return ERR_MEMORY_ALLOCATION;
+    char **args = malloc(sizeof(char *) * token_count);
+    if (args == NULL) {
+      printf("Memory allocation failed\n");
+      free(input_copy);
+      continue;
     }
 
     args[0] = strtok(input_copy, " ");
-    char * command = args[0];
+    char *command = args[0];
     for (int i = 1; i < token_count; i++) {
-        args[i] = strtok(NULL, " ");
+      args[i] = strtok(NULL, " ");
+      // printf("arg[%d]: %s\n",i,args[i]);
     }
 
-    if (!strcmp(input_copy, "exit")){
-        free(input_copy);
-        return ERR_SUCCESS;
-    }
-
-    int error_code = ERR_UNKNOWN;
-    
     // Check if command matches any known command and call its function
-    for (int i = 0; i < NUM_COMMANDS; i++){
-        if (!strcmp(command, commands[i].name)){
-            if (
-                !(token_count - 1 == commands[i].arg_count) 
-                && commands[i].arg_count != -1
-            ){
-                error_code = ERR_INVALID_ARGC;
-                break;
-            }
-            // execute the command
-            error_code = commands[i].function(token_count, args);
-            break;
+    int command_found = 0;
+    for (int i = 0; i < NUM_COMMANDS; i++) {
+      if (!strcmp(command, commands[i].name)) {
+        command_found = 1;
+        if (!(token_count - 1 == commands[i].arg_count) &&
+            commands[i].arg_count != -1) {
+          printf("Invalid number of arguments for function %s, expected: %d, "
+                 "got %d\n",
+                 commands[i].name, commands[i].arg_count, token_count - 1);
+          break;
         }
+        // execute the command
+        last_error_num = commands[i].function(token_count, args);
+        last_command_executed = 1;
+        if (last_error_num != ERR_SUCCESS) {
+          // Command failed, print error message
+          const char *error_msg = get_error_message((ErrorCode)last_error_num);
+          if (error_msg) {
+            fprintf(stderr, "Error: %s\n", error_msg);
+          } else {
+            fprintf(stderr, "Command returned with error code: %d\n",
+                    last_error_num);
+          }
+        }
+        break;
+      }
     }
-    
+
+    if (!command_found) {
+      printf("Unknown command: %s\n", command);
+    }
+
     free(input_copy);
     free(args);
-    return error_code;
+  }
+
+  free(input);
+  return;
+}
+
+/**
+ * @brief Parses and executes a single command string.
+ *
+ * Tokenizes the input string into command and arguments, validates the argument
+ * count, and calls the corresponding command function if found.
+ *
+ * @param input_string The full command line string to execute.
+ * @return int The error code returned by the command, or
+ * ERR_UNKNOWN/ERR_INVALID_ARGC/ERR_MEMORY_ALLOCATION.
+ */
+int execute_command_string(const char *input_string) {
+  if (!input_string || input_string[0] == '\0') {
+    return ERR_SUCCESS; // Empty lines are OK
+  }
+
+  char *input_copy = strdup(input_string);
+  if (input_copy == NULL) {
+    return ERR_MEMORY_ALLOCATION;
+  }
+
+  char *command_token = strtok(input_copy, " ");
+  if (command_token == NULL) {
+    free(input_copy);
+    return ERR_SUCCESS; // Empty or whitespace-only lines
+  }
+
+  // count tokens after first one
+  int token_count = 1;
+  while (strtok(NULL, " ") != NULL)
+    token_count++;
+
+  // Free the first copy and make a fresh one for argument parsing
+  free(input_copy);
+  input_copy = strdup(input_string);
+  if (input_copy == NULL) {
+    return ERR_MEMORY_ALLOCATION;
+  }
+
+  char **args = malloc(sizeof(char *) * token_count);
+  if (args == NULL) {
+    free(input_copy);
+    return ERR_MEMORY_ALLOCATION;
+  }
+
+  args[0] = strtok(input_copy, " ");
+  char *command = args[0];
+  for (int i = 1; i < token_count; i++) {
+    args[i] = strtok(NULL, " ");
+  }
+
+  if (!strcmp(input_copy, "exit")) {
+    free(input_copy);
+    return ERR_SUCCESS;
+  }
+
+  int error_code = ERR_UNKNOWN;
+
+  // Check if command matches any known command and call its function
+  for (int i = 0; i < NUM_COMMANDS; i++) {
+    if (!strcmp(command, commands[i].name)) {
+      if (!(token_count - 1 == commands[i].arg_count) &&
+          commands[i].arg_count != -1) {
+        error_code = ERR_INVALID_ARGC;
+        break;
+      }
+      // execute the command
+      error_code = commands[i].function(token_count, args);
+      break;
+    }
+  }
+
+  free(input_copy);
+  free(args);
+  return error_code;
 }

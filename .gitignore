@@ -90,3 +90,16 @@ CMakeUserPresets.json
 *-prefix/
 
 # End of https://www.toptal.com/developers/gitignore/api/c,cmake
+docs/fasthesis.cls
+docs/main.aux
+docs/main.bbl
+docs/main.bcf
+docs/main.blg
+docs/main.fdb_latexmk
+docs/main.fls
+docs/main.log
+docs/main.pdf
+docs/main.run.xml
+docs/main.synctex.gz
+docs/main.toc
+docs/img

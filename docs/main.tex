@@ -1,0 +1,79 @@
+\documentclass[english, kiv, sem, he, iso690alph, pdf, viewonly]{fasthesis}
+\title{I-node based Filesystem}
+\author{Jan}{Hejdušek}
+\supervisor{}
+\assignment{sw2025-02.pdf}
+
+\usepackage{csquotes}
+\usepackage{pdfpages}
+
+\nobastardtitle
+\nocopyrightnotice
+
+\newif\iffullbuild
+\fullbuildtrue
+
+\lstset{style=FASThesisLstStyle, numberblanklines=false, tabsize=5,
+keywordstyle=\color{red}}
+
+\begin{document}
+\iffullbuild
+\frontpages[notm]
+\tableofcontents
+\fi
+
+\chapter{Introduction}
+\chapter{Analysis}
+\chapter{Implementation}
+\chapter{User guide}
+\section{Compilation}
+
+The program is designed to be
+portable across platforms with a compliant C compiler. While the
+application can be built using a standard toolchain, makefiles for
+the GCC compiler are
+provided for both GNU/Linux and Microsoft Windows environments.
+
+\section{Execution}
+
+The application supports two modes of operation: interactive mode and
+batch processing.
+Executing the program without arguments initiates the interactive
+interpreter (REPL).
+Alternatively, providing a file path as an argument processes the
+contents of the specified file with Lisp source code.
+A verbose execution mode, which prints results of outer expressions,
+can be enabled by appending the \texttt{-v} flag when running with an
+input file. Example of running the program in a Linux environment on a
+Lisp source code with bubble sort\footnote{The Lisp source code for
+  the bubble sort algorithm was taken from the assignment at the end of
+this document} algorithm:
+
+\setuxprompt{hejdula@linux}{home}
+\begin{console}{Example of running the program}
+`\uxprompt` clisp.exe path/to/bubble_sort.lisp -v
+[1]> (SET (QUOTE ARR) (QUOTE (2 5 1 9 0 8 3 7 4 6)))
+(2 5 1 9 0 8 3 7 4 6)
+[2]> (SET (QUOTE SWAPPED) T)
+T
+[3]> (SET (QUOTE LEN) (LENGTH ARR))
+10
+[4]> (WHILE SWAPPED (SET (QUOTE I) 1) (SET (QUOTE SWAPPED) NIL)
+  (WHILE (< I LEN) (SET (QUOTE NUM1) (NTH (- I 1) ARR)) (SET (QUOTE
+    NUM2) (NTH I ARR)) (IF (> NUM1 NUM2) (WHILE T (SET (NTH (- I 1)
+ARR) NUM2) (SET (NTH I ARR) NUM1) (SET (QUOTE SWAPPED) T) (BRK))) (INC I 1)))
+NIL
+(0 1 2 3 4 5 6 7 8 9)
+[5]> (PRINT ARR)
+(0 1 2 3 4 5 6 7 8 9)
+`\uxprompt`
+\end{console}
+
+\chapter{Conclusion}
+\section{Functionality}
+\subsection{Test Runs}
+\section{Expectations}
+\section{Possible Improvements}
+\section{Difficulties}
+
+\end{document}

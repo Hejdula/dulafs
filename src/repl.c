@@ -8,6 +8,14 @@
 #define INPUT_BUFFER_SIZE 1024
 
 
+/**
+ * @brief Starts the Read-Eval-Print Loop (REPL) for the filesystem shell.
+ * 
+ * Displays a welcome message and available commands. Continuously prompts the user
+ * for input, parses the command line, executes the corresponding command function,
+ * and displays the result or error message. The loop terminates when "exit" is entered
+ * or EOF is encountered.
+ */
 void repl(){
     printf("Welcome to dula REPL, available commands: ");
     
@@ -31,7 +39,7 @@ void repl(){
             else { printf("[\033[0;31m%d\033[0m] ", last_error_num); }
         }
         last_command_executed = 0;
-        printf("\033[38;5;117mdulafs\033[0m:\033[38;5;227m%s\033[0m> ", g_system_state.working_dir);  // Show current directory in prompt (working dir is soft yellow)
+        printf("\033[38;5;117mdulafs\033[0m:\033[38;5;227m%s\033[0m> ", g_system_state.working_dir);
         fflush(stdout); 
 
         if (fgets(input, INPUT_BUFFER_SIZE, stdin) == NULL) {
@@ -39,7 +47,7 @@ void repl(){
             break;
         }
         
-        input[strcspn(input, "\n")] = '\0'; // Remove newline character
+        input[strcspn(input, "\n")] = '\0';
         
         char* input_copy = strdup(input);
         if (input_copy == NULL) { printf("Memory allocation failed\n"); continue; }
@@ -112,7 +120,15 @@ void repl(){
     return;
 }
 
-// Returns the error code from command execution
+/**
+ * @brief Parses and executes a single command string.
+ * 
+ * Tokenizes the input string into command and arguments, validates the argument count,
+ * and calls the corresponding command function if found.
+ * 
+ * @param input_string The full command line string to execute.
+ * @return int The error code returned by the command, or ERR_UNKNOWN/ERR_INVALID_ARGC/ERR_MEMORY_ALLOCATION.
+ */
 int execute_command_string(const char* input_string) {
     if (!input_string || input_string[0] == '\0') {
         return ERR_SUCCESS; // Empty lines are OK

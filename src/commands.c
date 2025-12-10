@@ -10,6 +10,17 @@
 
 
 // Command function implementations
+
+/**
+ * @brief Formats the virtual disk.
+ * 
+ * Parses the size argument (handling K/M suffixes), initializes the superblock,
+ * writes it to the start of the file, and creates the root directory.
+ * 
+ * @param argc Number of arguments.
+ * @param argv Array of arguments.
+ * @return int Error code.
+ */
 int cmd_format(int argc, char** argv) {
     int multiplier = 1, length;
 
@@ -43,6 +54,16 @@ int cmd_format(int argc, char** argv) {
     return ERR_SUCCESS;
 }
 
+/**
+ * @brief Copies a file within the virtual filesystem.
+ * 
+ * Resolves source inode, allocates a new inode and clusters, copies data 
+ * cluster-by-cluster from source to destination, and adds the new entry to the target directory.
+ * 
+ * @param argc Number of arguments.
+ * @param argv Array of arguments.
+ * @return int Error code.
+ */
 int cmd_cp(int argc, char** argv) {
     if(!unused_inodes_left()) return ERR_INODE_FULL;
     // get inode to copy
@@ -117,6 +138,16 @@ int cmd_cp(int argc, char** argv) {
     return ERR_SUCCESS;
 }
 
+/**
+ * @brief Moves or renames a file.
+ * 
+ * Creates a new directory entry in the destination pointing to the source inode,
+ * then removes the original directory entry from the source directory.
+ * 
+ * @param argc Number of arguments.
+ * @param argv Array of arguments.
+ * @return int Error code.
+ */
 int cmd_mv(int argc, char** argv) { 
     // get source node
     char* from_file_name = NULL;
@@ -155,6 +186,16 @@ int cmd_mv(int argc, char** argv) {
     return ERR_SUCCESS;
 }
 
+/**
+ * @brief Removes a file.
+ * 
+ * Locates the parent directory and calls delete_item to remove the entry.
+ * If the inode reference count drops to zero, the inode and its data are freed.
+ * 
+ * @param argc Number of arguments.
+ * @param argv Array of arguments.
+ * @return int Error code.
+ */
 int cmd_rm(int argc, char** argv) {
 
     char* file_name = NULL;
@@ -173,6 +214,16 @@ int cmd_rm(int argc, char** argv) {
     return result;
 }
 
+/**
+ * @brief Creates a new directory.
+ * 
+ * Allocates a new inode, initializes it as a directory (adding '.' and '..' entries),
+ * and adds a reference to it in the parent directory.
+ * 
+ * @param argc Number of arguments.
+ * @param argv Array of arguments.
+ * @return int Error code.
+ */
 int cmd_mkdir(int argc, char** argv) {
     if (!unused_inodes_left()) return ERR_INODE_FULL;
     char* dir_name = NULL;
@@ -198,6 +249,15 @@ int cmd_mkdir(int argc, char** argv) {
     return ERR_SUCCESS;
 }
 
+/**
+ * @brief Removes an empty directory.
+ * 
+ * Verifies the target is a directory and not '.' or '..', then calls delete_item
+ * 
+ * @param argc Number of arguments.
+ * @param argv Array of arguments.
+ * @return int Error code.
+ */
 int cmd_rmdir(int argc, char** argv) {
 
     char* dir_name = NULL;
@@ -211,6 +271,15 @@ int cmd_rmdir(int argc, char** argv) {
     return result;
 }
     
+/**
+ * @brief Lists directory contents.
+ * 
+ * Reads directory entries from the target inode's data clusters and prints: name, inode ID, size, and reference count for each item.
+ * 
+ * @param argc Number of arguments.
+ * @param argv Array of arguments.
+ * @return int Error code.
+ */
 int cmd_ls(int argc, char** argv) {
 
     struct inode curr_inode;
@@ -239,6 +308,16 @@ int cmd_ls(int argc, char** argv) {
     return ERR_SUCCESS;
 }
 
+/**
+ * @brief Displays file contents.
+ * 
+ * Reads all data bytes from the file's allocated clusters and prints them to stdout.
+ * Zero bytes are printed by white square.
+ * 
+ * @param argc Number of arguments.
+ * @param argv Array of arguments.
+ * @return int Error code.
+ */
 int cmd_cat(int argc, char** argv) { 
     int node_id = path_to_inode(argv[1]);
     if (node_id < 0) return -node_id;
@@ -247,7 +326,7 @@ int cmd_cat(int argc, char** argv) {
     // printf("inode size: %d\n", inode.file_size);
     for (int i = 0; i < inode.file_size; i++) {
         if (data[i] == 0){
-            printf("\xE2\x96\xA1"); // Unicode white square (U+25A1) in UTF-8 to represent zero byte
+            printf("\xE2\x96\xA1"); // Unicode white square in UTF-8 to represent zero byte
         } else {
             putchar(data[i]);
         }
@@ -258,6 +337,16 @@ int cmd_cat(int argc, char** argv) {
     return ERR_SUCCESS;
 }
 
+/**
+ * @brief Changes the current working directory.
+ * 
+ * Resolves the target path to an inode, verifies it is a directory, and updates
+ * the global system state's current node ID.
+ * 
+ * @param argc Number of arguments.
+ * @param argv Array of arguments.
+ * @return int Error code.
+ */
 int cmd_cd(int argc, char** argv) {
     int new_node_id = path_to_inode(argv[1]);
     if (new_node_id < 0){
@@ -276,6 +365,16 @@ int cmd_cd(int argc, char** argv) {
     return ERR_SUCCESS;
 }
 
+/**
+ * @brief Prints the current working directory.
+ * 
+ * Reconstructs the full path string from the current inode ID by traversing
+ * parent pointers up to the root.
+ * 
+ * @param argc Number of arguments.
+ * @param argv Array of arguments.
+ * @return int Error code.
+ */
 int cmd_pwd(int argc, char** argv) {
     char* path = inode_to_path(g_system_state.curr_node_id);
     if(path == NULL){ return ERR_MEMORY_ALLOCATION;}
@@ -284,6 +383,16 @@ int cmd_pwd(int argc, char** argv) {
     return ERR_SUCCESS;
 }
 
+/**
+ * @brief Displays detailed information about a file or directory.
+ * 
+ * Retrieves the inode and prints metadata including size, reference count,
+ * and the list of allocated cluster IDs.
+ * 
+ * @param argc Number of arguments.
+ * @param argv Array of arguments.
+ * @return int Error code.
+ */
 int cmd_info(int argc, char** argv) {
     char* name = get_final_token(argv[1]);
     int inode_id = path_to_inode(argv[1]);
@@ -310,6 +419,16 @@ int cmd_info(int argc, char** argv) {
     return ERR_SUCCESS;
 }
 
+/**
+ * @brief Imports a file from the host filesystem.
+ * 
+ * Opens the host file, allocates a new inode and sufficient clusters, reads data
+ * from the host file into the virtual clusters, and adds a directory entry.
+ * 
+ * @param argc Number of arguments.
+ * @param argv Array of arguments.
+ * @return int Error code.
+ */
 int cmd_incp(int argc, char** argv) {
     if (!unused_inodes_left()) return ERR_INODE_FULL;
     FILE* fptr = fopen(argv[1],"r");
@@ -380,6 +499,16 @@ int cmd_incp(int argc, char** argv) {
     return ERR_SUCCESS;
 }
 
+/**
+ * @brief Exports a file to the host filesystem.
+ * 
+ * Reads the entire content of a virtual file into a buffer and writes it
+ * to a new file on the host system.
+ * 
+ * @param argc Number of arguments.
+ * @param argv Array of arguments.
+ * @return int Error code.
+ */
 int cmd_outcp(int argc, char** argv) {
     
     int file_node_id= path_to_inode(argv[1]);
@@ -405,6 +534,16 @@ int cmd_outcp(int argc, char** argv) {
     return ERR_SUCCESS;
 }
 
+/**
+ * @brief Executes commands from a script file.
+ * 
+ * Reads the host file line by line, skips comments/empty lines, and passes
+ * valid command strings to the command executor.
+ * 
+ * @param argc Number of arguments.
+ * @param argv Array of arguments.
+ * @return int Error code.
+ */
 int cmd_load(int argc, char** argv) {
     FILE* fptr = fopen(argv[1], "r");
     if (!fptr) {
@@ -444,8 +583,16 @@ int cmd_load(int argc, char** argv) {
     return ERR_SUCCESS;
 }
 
-/* count_dirs moved to dulafs.c */
-
+/**
+ * @brief Displays filesystem usage statistics.
+ * 
+ * Calculates used inodes and clusters by counting bits in bitmaps, and counts
+ * directories by scanning used inodes. Prints summary to stdout.
+ * 
+ * @param argc Number of arguments.
+ * @param argv Array of arguments.
+ * @return int Error code.
+ */
 int cmd_statfs(int argc, char** argv) {
     if (g_system_state.sb.disk_size == 0){ return ERR_UNKNOWN; }
 
@@ -467,6 +614,16 @@ int cmd_statfs(int argc, char** argv) {
     return ERR_SUCCESS;
 }
 
+/**
+ * @brief Creates a hard link to a file.
+ * 
+ * Resolves the source inode, increments its reference count,
+ * and adds a new directory entry pointing to the same inode ID.
+ * 
+ * @param argc Number of arguments.
+ * @param argv Array of arguments.
+ * @return int Error code.
+ */
 int ln(int argc, char** argv) {
     // get inode to link
     int original_inode_id = path_to_inode(argv[1]);

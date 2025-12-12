@@ -39,8 +39,8 @@ The document covers the following topics:
   \item Overview of the source code structure and the main roles of each module.
   \item User guide with instructions for compiling, running, and
     using the filesystem.
-  \item Conclusion summarizing the achieved functionality, testing,
-    possible improvements, and encountered difficulties.
+  \item Conclusion summarizing the achieved functionality,
+    possible improvements and encountered difficulties.
 \end{itemize}
 
 \chapter{Implementation}
@@ -200,7 +200,7 @@ command function).
 The program is designed to be portable across platforms with a
 compliant C compiler. A Makefile is provided for easy compilation using GCC.
 
-\subsection{Example Usage}
+\section{Example Usage}
 
 The application is a command-line tool that accepts a file to open as
 an argument (the file must exist).
@@ -212,36 +212,36 @@ Including also an invalid operation to showcase the error message.
 
 \setuxprompt{hejdula@linux}{home}
 \begin{console}{Example of running the program}
-  `\uxprompt`./dulafs.out vfsdisk.ula
-  Trying to open: vfsdisk.ula
-  Valid .ula filesystem detected!
+`\uxprompt`./dulafs.out vfsdisk.ula
+Trying to open: vfsdisk.ula
+Valid .ula filesystem detected!
 
-  === Superblock Information ===
-  Signature: 'HEJDULA'
-  Disk size: 20971520 bytes
-  Cluster size: 4096 bytes
-  Cluster count: 5016
-  Inode count: 10485
-  Inode bitmap start address: 40
-  Cluster bitmap start address: 1351
-  Inode start address: 1978
-  Data start address: 421407
-  ===============================
+=== Superblock Information ===
+Signature: 'HEJDULA'
+Disk size: 20971520 bytes
+Cluster size: 4096 bytes
+Cluster count: 5016
+Inode count: 10485
+Inode bitmap start address: 40
+Cluster bitmap start address: 1351
+Inode start address: 1978
+Data start address: 421407
+===============================
 
-  Welcome to dula REPL, available commands: format, cp, mv, rm,
-  mkdir, rmdir, ls, cat, cd, pwd, info, incp, outcp, load, statfs, ln, test
-  dulafs:/> mkdir dir
-  [ok] dulafs:/> ls
-  ..           | inode:   0 | size:     48 bytes | refs: 0
-  .            | inode:   0 | size:     48 bytes | refs: 0
-  dir          | inode:   1 | size:     32 bytes | refs: 1
-  [ok] dulafs:/> incp hello dir/hi
-  [ok] dulafs:/> cat hi
-  Error: Path not found
-  [3] dulafs:/> cat dir/hi
-  hello
-  [ok] dulafs:/> exit
-  `\uxprompt`
+Welcome to dula REPL, available commands: format, cp, mv, rm,
+mkdir, rmdir, ls, cat, cd, pwd, info, incp, outcp, load, statfs, ln, test
+dulafs:/> mkdir dir
+[ok] dulafs:/> ls
+..           | inode:   0 | size:     48 bytes | refs: 0
+.            | inode:   0 | size:     48 bytes | refs: 0
+dir          | inode:   1 | size:     32 bytes | refs: 1
+[ok] dulafs:/> incp hello dir/hi
+[ok] dulafs:/> cat hi
+Error: Path not found
+[3] dulafs:/> cat dir/hi
+hello
+[ok] dulafs:/> exit
+`\uxprompt`
 \end{console}
 
 \chapter{Conclusion}

@@ -23,57 +23,263 @@ keywordstyle=\color{red}}
 \fi
 
 \chapter{Introduction}
-\chapter{Analysis}
+This document is a documentation to a seminar work for the course
+\lstinline|KIV/ZOS|.
+
+It describes the implementation of a simple virtual
+filesystem based on the i-nodes. The filesystem simulates a disk
+using a binary file and provides basic operations for file and
+directory management. The goal of this project is to demonstrate
+understanding of low-level filesystem structures.
+
+The document covers the following topics:
+
+\begin{itemize}
+  \item Description of the internal disk layout and core data structures.
+  \item Overview of the source code structure and the main roles of each module.
+  \item User guide with instructions for compiling, running, and
+    using the filesystem.
+  \item Conclusion summarizing the achieved functionality, testing,
+    possible improvements, and encountered difficulties.
+\end{itemize}
+
 \chapter{Implementation}
+
+The filesystem is implemented in C and operates on a virtual disk
+file. The disk structure is divided into sections:
+
+\begin{itemize}
+  \item \textbf{Superblock}: Contains global metadata about the
+    filesystem, such as the disk size, block size, and pointers to
+    other regions.
+  \item \textbf{I-node Bitmap}: A bit array indicating which i-nodes
+    are currently in use.
+  \item \textbf{Data Bitmap}: A bit array indicating which data
+    blocks are occupied.
+  \item \textbf{I-nodes}: An array of i-node structures. Each i-node
+    stores metadata for a file or directory (size, type, pointers to
+    data blocks).
+  \item \textbf{Data Clusters}: The actual storage area for file
+    content and directory entries.
+\end{itemize}
+
+\section{Core Structures}
+
+The implementation relies on several C structures. Some of those were
+inspired by
+a sample source codes provided by the course.
+
+\subsection{Superblock}
+The \texttt{superblock} structure stored at the beginning of the disk
+and defines its layout. It includes necessary data for managing the
+filesystem. It contains size of the disk, counts for i-nodes and
+clusters, cluster size in bytes and
+byte offsets pointing to the start of bitmaps, i-node table, and
+data regions.
+
+\subsection{I-node}
+The \texttt{inode} structure stores following:
+\begin{itemize}
+  \item \texttt{node\_type}: To distinguish between files and directories.
+  \item \texttt{file\_size}: The size of the file in bytes.
+  \item \texttt{direct\_blocks}: A static array of cluster IDs.
+  \item \texttt{indirect\_blocks}: Single and double indirect cluster IDs.
+\end{itemize}
+
+\section{Source Code Organization}
+
+The source code is modularized to separate the user interface,
+high-level command logic, and low-level filesystem operations.
+
+\subsection{Main Entry Point (\texttt{main.c})}
+This module serves as the application's entry point. It is
+responsible for the initial setup of the environment. Specifically, it:
+\begin{itemize}
+  \item Validates command-line arguments to ensure a disk file path is provided.
+  \item Opens the virtual disk file in binary read/write mode.
+  \item Reads the superblock to verify the filesystem signature
+    (\texttt{"HEJDULA"}).
+  \item Prints the disk geometry (size, cluster count, etc.) upon startup.
+  \item Initializes the global system state and hands over control to the REPL.
+\end{itemize}
+
+\subsection{Interactive Shell (\texttt{repl.c})}
+The \texttt{repl.c} module implements the Read-Eval-Print Loop
+(REPL), providing the command-line interface for the user. Its
+primary responsibilities include:
+\begin{itemize}
+  \item \textbf{Input Parsing}: It reads user input, handles
+    tokenization, and parses arguments.
+  \item \textbf{Command Dispatch}: It matches the input token against
+    a registry of available commands and invokes the corresponding function.
+  \item \textbf{Error Handling}: It translates numeric error codes
+    returned by commands into human-readable error messages.
+  \item \textbf{Batch Processing}: It includes logic to read and
+    execute commands line-by-line from an external script file via
+    the \texttt{load} command.
+\end{itemize}
+
+\subsection{Core Filesystem Engine (\texttt{dulafs.c})}
+This is the main module handling the low-level logic and internal functioning
+of the filesystem. It abstracts binary file operations into logical
+filesystem primitives. It is further divided into functional areas:
+
+\subsubsection{Formatting the Virtual Disk}
+Formatting sets up the main parts of the virtual disk file: the superblock,
+bitmaps, inode table, and data clusters. It calculates where
+each part goes and writes the superblock at the start of the file.
+Formatting also initializes the root directory and its cluster.
+
+It is possible to set a ratio of inodes to clusters and size of
+idividual clusters.
+
+\subsubsection{Bitmap Management}
+Functions such as \texttt{set\_bit}, \texttt{clear\_bit}, and
+\texttt{get\_empty\_index} directly manipulate the bits in the inode
+and data bitmaps. This ensures efficient tracking of free and occupied space.
+
+\subsubsection{Inode Operations}
+This part of the code manages the life cycle and usage of i-nodes,
+which are the main structures for storing information about files and
+directories. The following operations work with i-nodes:
+
+\begin{itemize}
+  \item \textbf{Allocation}: Finds a free i-node using the i-node
+    bitmap and marks it as used when a new file or directory is created.
+  \item \textbf{Reading and Writing}: Loads i-node data from and
+    saving data to the inode clusters.
+  \item \textbf{Cluster Assignment}: Uses the
+    \texttt{assign\_node\_clusters} function to allocate data blocks
+    (clusters) for files, including handling direct, single indirect,
+    and double indirect pointers for larger files.
+  \item \textbf{Deletion}: Frees the i-node and its associated data
+    blocks when a file or directory is deleted and updating the bitmaps.
+  \item \textbf{Reference Counting}: Keeps track of how many
+    directory entries point to an i-node, so it is only deleted when
+    no references remain.
+\end{itemize}
+
+\subsubsection{Directory and Path Logic}
+This part of the code manages how directories are organized and how
+paths are resolved in the filesystem. It allows the system to work
+with a tree-like structure of folders and files. It handles the following:
+
+\begin{itemize}
+  \item \textbf{Path Resolution}: Finds the i-node for a given path
+    string (like \texttt{/home/user/file}) by walking through the
+    directory tree step by step. The \texttt{path\_to\_inode}
+    function is used for this.
+  \item \textbf{Directory Entry Management}: Adds new files or
+    directories to a folder, or removes them, by updating the list of
+    directory entries. Functions like \texttt{add\_record\_to\_dir}
+    and \texttt{delete\_item} handle these changes.
+  \item \textbf{Parent and Self References}: Handles automatic
+    creation of entries \texttt{.} (current directory) and
+    \texttt{..} (parent directory).
+  \item \textbf{Name Lookup}: Searches for a file or directory by
+    name within a folder to check if it exists or to get its i-node.
+  \item \textbf{Path Parsing}: Splits a path into its components to
+    find parent directories or the final file/directory name.
+\end{itemize}
+
+\subsection{Command Implementation (\texttt{commands.c})}
+This module contains the main logic for all user commands,
+such as \texttt{ls}, \texttt{cp}, and \texttt{mkdir}.
+
+All command functions have the same signature: they take the number
+of arguments (\texttt{argc}) and an array of argument strings
+(\texttt{argv}), and return an integer error code. The implemented
+commands are stored in a structure that includes the command name, a
+pointer to its function and the expected number of arguments (or
+  \texttt{-1} to not check the number of args before calling the
+command function).
+
 \chapter{User guide}
 \section{Compilation}
 
-The program is designed to be
-portable across platforms with a compliant C compiler. While the
-application can be built using a standard toolchain, makefiles for
-the GCC compiler are
-provided for both GNU/Linux and Microsoft Windows environments.
+The program is designed to be portable across platforms with a
+compliant C compiler. A Makefile is provided for easy compilation using GCC.
 
-\section{Execution}
+\subsection{Example Usage}
 
-The application supports two modes of operation: interactive mode and
-batch processing.
-Executing the program without arguments initiates the interactive
-interpreter (REPL).
-Alternatively, providing a file path as an argument processes the
-contents of the specified file with Lisp source code.
-A verbose execution mode, which prints results of outer expressions,
-can be enabled by appending the \texttt{-v} flag when running with an
-input file. Example of running the program in a Linux environment on a
-Lisp source code with bubble sort\footnote{The Lisp source code for
-  the bubble sort algorithm was taken from the assignment at the end of
-this document} algorithm:
+The application is a command-line tool that accepts a file to open as
+an argument (the file must exist).
+
+Below is an example session demonstrating opening an existing
+formated virtual disk file to 20MB,
+making a directory, copying in a file and printing its content.
+Including also an invalid operation to showcase the error message.
 
 \setuxprompt{hejdula@linux}{home}
 \begin{console}{Example of running the program}
-`\uxprompt` clisp.exe path/to/bubble_sort.lisp -v
-[1]> (SET (QUOTE ARR) (QUOTE (2 5 1 9 0 8 3 7 4 6)))
-(2 5 1 9 0 8 3 7 4 6)
-[2]> (SET (QUOTE SWAPPED) T)
-T
-[3]> (SET (QUOTE LEN) (LENGTH ARR))
-10
-[4]> (WHILE SWAPPED (SET (QUOTE I) 1) (SET (QUOTE SWAPPED) NIL)
-  (WHILE (< I LEN) (SET (QUOTE NUM1) (NTH (- I 1) ARR)) (SET (QUOTE
-    NUM2) (NTH I ARR)) (IF (> NUM1 NUM2) (WHILE T (SET (NTH (- I 1)
-ARR) NUM2) (SET (NTH I ARR) NUM1) (SET (QUOTE SWAPPED) T) (BRK))) (INC I 1)))
-NIL
-(0 1 2 3 4 5 6 7 8 9)
-[5]> (PRINT ARR)
-(0 1 2 3 4 5 6 7 8 9)
-`\uxprompt`
+  `\uxprompt`./dulafs.out vfsdisk.ula
+  Trying to open: vfsdisk.ula
+  Valid .ula filesystem detected!
+
+  === Superblock Information ===
+  Signature: 'HEJDULA'
+  Disk size: 20971520 bytes
+  Cluster size: 4096 bytes
+  Cluster count: 5016
+  Inode count: 10485
+  Inode bitmap start address: 40
+  Cluster bitmap start address: 1351
+  Inode start address: 1978
+  Data start address: 421407
+  ===============================
+
+  Welcome to dula REPL, available commands: format, cp, mv, rm,
+  mkdir, rmdir, ls, cat, cd, pwd, info, incp, outcp, load, statfs, ln, test
+  dulafs:/> mkdir dir
+  [ok] dulafs:/> ls
+  ..           | inode:   0 | size:     48 bytes | refs: 0
+  .            | inode:   0 | size:     48 bytes | refs: 0
+  dir          | inode:   1 | size:     32 bytes | refs: 1
+  [ok] dulafs:/> incp hello dir/hi
+  [ok] dulafs:/> cat hi
+  Error: Path not found
+  [3] dulafs:/> cat dir/hi
+  hello
+  [ok] dulafs:/> exit
+  `\uxprompt`
 \end{console}
 
 \chapter{Conclusion}
 \section{Functionality}
-\subsection{Test Runs}
-\section{Expectations}
-\section{Possible Improvements}
-\section{Difficulties}
+The filesystem works according to the assignment and supports all the
+required basic file operations. It can create, delete, and list files
+and directories, and manages free space. The system
+supports hierarchical directories and can handle files of different
+sizes using direct and indirect addressing. Overall, the main
+features work as expected and the filesystem can be used for simple
+file management tasks.
 
+\section{Expectations}
+While working on this project, I was surprised by how much overhead
+is needed for a filesystem, even when it is designed to be as simple
+as possible. There are many details to handle, such as keeping track
+of free space, managing metadata, and making sure all the structures
+are consistent. Even a minimal filesystem requires a lot of
+supporting code and careful planning.
+
+\section{Possible Improvements}
+There are several areas where the project could be improved. I am not
+fully satisfied with how errors are handled, sometimes the errors are
+not fully propagated all the way and not every failing operation is
+properly handled.
+The way relative paths are resolved could also be made more robust
+and simpler to use.
+Another thing, the global variables/structures are badly structured
+and it is not clear what exactly it does.
+
+\section{Difficulties}
+One of the main difficulties was that a lot of code had to be written
+before I could even test if anything worked. Many parts of the system
+depend on each other, so it was challenging to get everything working
+together. I often had to refactor the code as I discovered better
+ways to organize it or found bugs.
+
+Handling all the edge cases and
+figuring out where things could fail also took a lot of time and
+effort.
 \end{document}
